@@ -1,0 +1,8 @@
+spring:
+  application:
+    name: spring-boot-admin-panel-project
+  profiles:
+    active: dev
+
+server:
+  port: 8080
