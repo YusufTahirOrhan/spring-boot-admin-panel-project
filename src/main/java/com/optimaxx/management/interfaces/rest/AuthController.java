@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,18 +25,31 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public AuthLoginResponse login(@RequestBody AuthLoginRequest request) {
-        return authService.login(request);
+    public AuthLoginResponse login(@RequestBody AuthLoginRequest request,
+                                   @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+                                   @RequestHeader(value = "User-Agent", required = false) String userAgent,
+                                   @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor) {
+        return authService.login(request, deviceId, userAgent, forwardedFor);
     }
 
     @PostMapping("/refresh")
-    public AuthLoginResponse refresh(@RequestBody AuthRefreshRequest request) {
-        return authService.refresh(request);
+    public AuthLoginResponse refresh(@RequestBody AuthRefreshRequest request,
+                                     @RequestHeader(value = "X-Device-Id", required = false) String deviceId,
+                                     @RequestHeader(value = "User-Agent", required = false) String userAgent,
+                                     @RequestHeader(value = "X-Forwarded-For", required = false) String forwardedFor) {
+        return authService.refresh(request, deviceId, userAgent, forwardedFor);
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestBody AuthLogoutRequest request) {
-        authService.logout(request == null ? null : request.refreshToken());
+    public ResponseEntity<Void> logout(@RequestBody AuthLogoutRequest request,
+                                       @RequestHeader(value = "X-Device-Id", required = false) String deviceId) {
+        authService.logout(request == null ? null : request.refreshToken(), deviceId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/logout-all")
+    public ResponseEntity<Void> logoutAll(Authentication authentication) {
+        authService.logoutAllDevices(authentication == null ? null : authentication.getName());
         return ResponseEntity.noContent().build();
     }
 
