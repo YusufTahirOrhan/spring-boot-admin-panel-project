@@ -15,3 +15,11 @@ management:
   endpoint:
     health:
       show-details: always
+
+security:
+  bootstrap:
+    owner:
+      enabled: ${BOOTSTRAP_OWNER_ENABLED:true}
+      username: ${BOOTSTRAP_OWNER_USERNAME:owner}
+      email: ${BOOTSTRAP_OWNER_EMAIL:owner@optimaxx.local}
+      password: ${BOOTSTRAP_OWNER_PASSWORD:owner12345}
