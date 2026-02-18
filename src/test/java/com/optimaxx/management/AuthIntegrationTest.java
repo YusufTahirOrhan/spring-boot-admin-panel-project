@@ -13,6 +13,7 @@ import com.optimaxx.management.domain.model.RefreshToken;
 import com.optimaxx.management.domain.model.User;
 import com.optimaxx.management.domain.model.UserRole;
 import com.optimaxx.management.domain.repository.ActivityLogRepository;
+import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
 import com.optimaxx.management.security.LoginAttemptService;
@@ -64,6 +65,9 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private ActivityLogRepository activityLogRepository;
+
+    @MockitoBean
+    private PasswordResetTokenRepository passwordResetTokenRepository;
 
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();
@@ -297,6 +301,52 @@ class AuthIntegrationTest {
                         .header("Authorization", "Bearer " + ownerToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"deviceId\":\"device-1\"}"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldRequestAndCompletePasswordResetFlow() throws Exception {
+        User owner = new User();
+        owner.setUsername("owner");
+        owner.setEmail("owner@optimaxx.local");
+        owner.setRole(UserRole.OWNER);
+        owner.setActive(true);
+        owner.setDeleted(false);
+        owner.setStoreId(UUID.randomUUID());
+
+        com.optimaxx.management.domain.model.PasswordResetToken resetToken = new com.optimaxx.management.domain.model.PasswordResetToken();
+        resetToken.setUser(owner);
+        resetToken.setUsed(false);
+        resetToken.setExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(userRepository.findByEmailAndDeletedFalse("owner@optimaxx.local")).thenReturn(Optional.of(owner));
+        when(passwordResetTokenRepository.findByUserAndUsedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
+                .thenReturn(java.util.List.of());
+        when(passwordResetTokenRepository.save(any(com.optimaxx.management.domain.model.PasswordResetToken.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(passwordResetTokenRepository.findByTokenHashAndUsedFalseAndExpiresAtAfter(anyString(), any(Instant.class)))
+                .thenReturn(Optional.of(resetToken));
+        when(passwordEncoder.encode("newPassword123")).thenReturn("new-hash");
+        when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
+                .thenReturn(java.util.List.of());
+
+        String forgotBody = """
+                {"email":"owner@optimaxx.local"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(forgotBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resetToken").isNotEmpty());
+
+        String resetBody = """
+                {"resetToken":"any-token","newPassword":"newPassword123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resetBody))
                 .andExpect(status().isNoContent());
     }
 

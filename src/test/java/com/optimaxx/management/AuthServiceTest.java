@@ -8,15 +8,19 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.optimaxx.management.domain.model.PasswordResetToken;
 import com.optimaxx.management.domain.model.RefreshToken;
 import com.optimaxx.management.domain.model.User;
 import com.optimaxx.management.domain.model.UserRole;
+import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
 import com.optimaxx.management.interfaces.rest.dto.AuthChangePasswordRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginResponse;
 import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
+import com.optimaxx.management.interfaces.rest.dto.ForgotPasswordResponse;
+import com.optimaxx.management.interfaces.rest.dto.ResetPasswordRequest;
 import com.optimaxx.management.security.AuthService;
 import com.optimaxx.management.security.LoginAttemptService;
 import com.optimaxx.management.security.LoginProtectionProperties;
@@ -41,6 +45,7 @@ class AuthServiceTest {
 
         UserRepository userRepository = Mockito.mock(UserRepository.class);
         RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
         User user = createActiveUser();
@@ -51,6 +56,7 @@ class AuthServiceTest {
         AuthService authService = new AuthService(
                 userRepository,
                 refreshTokenRepository,
+                passwordResetTokenRepository,
                 passwordEncoder,
                 createLoginAttemptService(),
                 jwtTokenService,
@@ -104,11 +110,13 @@ class AuthServiceTest {
         JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);
         UserRepository userRepository = Mockito.mock(UserRepository.class);
         RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
         AuthService authService = new AuthService(
                 userRepository,
                 refreshTokenRepository,
+                passwordResetTokenRepository,
                 passwordEncoder,
                 createLoginAttemptService(),
                 jwtTokenService,
@@ -129,6 +137,7 @@ class AuthServiceTest {
 
         UserRepository userRepository = Mockito.mock(UserRepository.class);
         RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
         User user = createActiveUser();
@@ -144,6 +153,7 @@ class AuthServiceTest {
         AuthService authService = new AuthService(
                 userRepository,
                 refreshTokenRepository,
+                passwordResetTokenRepository,
                 passwordEncoder,
                 createLoginAttemptService(),
                 jwtTokenService,
@@ -166,6 +176,7 @@ class AuthServiceTest {
 
         UserRepository userRepository = Mockito.mock(UserRepository.class);
         RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
         User user = createActiveUser();
@@ -173,7 +184,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("owner123", "hashed")).thenReturn(true);
         when(passwordEncoder.encode("newPassword123")).thenReturn("new-hash");
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         authService.changePassword("owner", new AuthChangePasswordRequest("owner123", "newPassword123"));
 
@@ -187,6 +198,7 @@ class AuthServiceTest {
 
         UserRepository userRepository = Mockito.mock(UserRepository.class);
         RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
         User user = createActiveUser();
@@ -200,7 +212,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
                 .thenReturn(java.util.List.of(token));
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         assertThat(authService.listDeviceSessions("owner", "device-1")).hasSize(1);
     }
@@ -212,6 +224,7 @@ class AuthServiceTest {
 
         UserRepository userRepository = Mockito.mock(UserRepository.class);
         RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
         User user = createActiveUser();
@@ -226,11 +239,71 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByUserAndDeviceIdAndRevokedFalseAndExpiresAtAfter(any(User.class), anyString(), any(Instant.class)))
                 .thenReturn(java.util.List.of(token));
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         authService.logoutDevice("owner", "device-1");
 
         assertThat(token.isRevoked()).isTrue();
+    }
+
+    @Test
+    void shouldIssuePasswordResetTokenWhenEmailExists() {
+        JwtProperties jwtProperties = new JwtProperties("this-is-a-very-long-dev-secret-key-for-tests-123456", 60, 120, "test");
+        JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);
+
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
+        PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
+
+        User user = createActiveUser();
+        user.setEmail("owner@optimaxx.local");
+        when(userRepository.findByEmailAndDeletedFalse("owner@optimaxx.local")).thenReturn(Optional.of(user));
+        when(passwordResetTokenRepository.findByUserAndUsedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
+                .thenReturn(java.util.List.of());
+
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+
+        ForgotPasswordResponse response = authService.forgotPassword("owner@optimaxx.local");
+
+        assertThat(response.resetToken()).isNotBlank();
+        verify(passwordResetTokenRepository).save(any());
+    }
+
+    @Test
+    void shouldResetPasswordAndRevokeSessions() {
+        JwtProperties jwtProperties = new JwtProperties("this-is-a-very-long-dev-secret-key-for-tests-123456", 60, 120, "test");
+        JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);
+
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
+        PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
+
+        User user = createActiveUser();
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setUser(user);
+        resetToken.setUsed(false);
+        resetToken.setExpiresAt(Instant.now().plusSeconds(3600));
+
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setRevoked(false);
+        refreshToken.setExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(passwordResetTokenRepository.findByTokenHashAndUsedFalseAndExpiresAtAfter(anyString(), any(Instant.class)))
+                .thenReturn(Optional.of(resetToken));
+        when(passwordEncoder.encode("newPassword123")).thenReturn("new-hash");
+        when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
+                .thenReturn(java.util.List.of(refreshToken));
+
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+
+        authService.resetPassword(new ResetPasswordRequest("raw-token", "newPassword123"));
+
+        assertThat(resetToken.isUsed()).isTrue();
+        assertThat(refreshToken.isRevoked()).isTrue();
+        assertThat(user.getPasswordHash()).isEqualTo("new-hash");
     }
 
     @Test
@@ -240,13 +313,14 @@ class AuthServiceTest {
 
         UserRepository userRepository = Mockito.mock(UserRepository.class);
         RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
         User user = createActiveUser();
         when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         assertThatThrownBy(() -> authService.changePassword("owner", new AuthChangePasswordRequest("wrong", "newPassword123")))
                 .isInstanceOf(BadCredentialsException.class);
@@ -262,6 +336,7 @@ class AuthServiceTest {
 
         UserRepository userRepository = Mockito.mock(UserRepository.class);
         RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
         when(userRepository.findByUsernameAndDeletedFalse(anyString())).thenReturn(userOptional);
@@ -269,6 +344,7 @@ class AuthServiceTest {
         return new AuthService(
                 userRepository,
                 refreshTokenRepository,
+                passwordResetTokenRepository,
                 passwordEncoder,
                 loginAttemptService,
                 jwtTokenService,
