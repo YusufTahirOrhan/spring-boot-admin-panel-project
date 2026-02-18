@@ -1,10 +1,17 @@
 spring:
   application:
-    name: spring-boot-admin-panel-project
+    name: optimaxx-management-system
   profiles:
-    active: dev
+    default: dev
+  threads:
+    virtual:
+      enabled: true
 
-server:
-  port: 8080
-
-# profile defaults
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

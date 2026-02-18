@@ -2,11 +2,36 @@ spring:
   config:
     activate:
       on-profile: prod
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
 
-server:
-  shutdown: graceful
+clickhouse:
+  url: ${CLICKHOUSE_URL}
+  username: ${CLICKHOUSE_USERNAME}
+  password: ${CLICKHOUSE_PASSWORD}
+
+security:
+  jwt:
+    secret-key: ${JWT_SECRET_KEY}
+    access-token-minutes: ${JWT_ACCESS_MINUTES:60}
+    issuer: optimaxx-prod
+
+management:
+  endpoint:
+    health:
+      show-details: never
 
 logging:
   level:
     root: INFO
-    com.yusuf.adminpanel: INFO
+    com.optimaxx.management: INFO
