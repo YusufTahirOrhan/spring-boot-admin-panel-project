@@ -13,6 +13,7 @@ import com.optimaxx.management.interfaces.rest.dto.AdminCreateUserRequest;
 import com.optimaxx.management.interfaces.rest.dto.UserResponse;
 import com.optimaxx.management.security.BootstrapOwnerProperties;
 import com.optimaxx.management.security.UserManagementService;
+import com.optimaxx.management.security.audit.SecurityAuditService;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -37,7 +38,7 @@ class UserManagementServiceTest {
             return user;
         });
 
-        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties);
+        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties, Mockito.mock(SecurityAuditService.class));
 
         UserResponse response = service.createUser(
                 new AdminCreateUserRequest("staff", "staff@optimaxx.local", "strong123", UserRole.STAFF, true)
@@ -56,7 +57,7 @@ class UserManagementServiceTest {
 
         when(userRepository.existsByUsernameAndDeletedFalse("staff")).thenReturn(true);
 
-        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties);
+        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties, Mockito.mock(SecurityAuditService.class));
 
         assertThatThrownBy(() -> service.createUser(
                 new AdminCreateUserRequest("staff", "staff@optimaxx.local", "strong123", UserRole.STAFF, true)
@@ -79,7 +80,7 @@ class UserManagementServiceTest {
         UUID userId = UUID.randomUUID();
         when(userRepository.findByIdAndDeletedFalse(userId)).thenReturn(Optional.of(user));
 
-        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties);
+        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties, Mockito.mock(SecurityAuditService.class));
 
         UserResponse response = service.updateRole(userId, UserRole.ADMIN);
 
@@ -109,7 +110,7 @@ class UserManagementServiceTest {
         when(userRepository.findByIdAndDeletedFalse(targetId)).thenReturn(Optional.of(target));
         when(userRepository.findByUsernameAndDeletedFalse("admin1")).thenReturn(Optional.of(actor));
 
-        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties);
+        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties, Mockito.mock(SecurityAuditService.class));
 
         service.softDeleteUser(targetId, "admin1");
 
@@ -134,7 +135,7 @@ class UserManagementServiceTest {
         when(userRepository.findByIdAndDeletedFalse(targetId)).thenReturn(Optional.of(actorAndTarget));
         when(userRepository.findByUsernameAndDeletedFalse("owner1")).thenReturn(Optional.of(actorAndTarget));
 
-        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties);
+        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties, Mockito.mock(SecurityAuditService.class));
 
         assertThatThrownBy(() -> service.softDeleteUser(targetId, "owner1"))
                 .isInstanceOf(ResponseStatusException.class);

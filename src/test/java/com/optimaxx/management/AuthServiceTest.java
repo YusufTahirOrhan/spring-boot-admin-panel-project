@@ -20,6 +20,7 @@ import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
 import com.optimaxx.management.security.AuthService;
 import com.optimaxx.management.security.LoginAttemptService;
 import com.optimaxx.management.security.LoginProtectionProperties;
+import com.optimaxx.management.security.audit.SecurityAuditService;
 import com.optimaxx.management.security.jwt.JwtProperties;
 import com.optimaxx.management.security.jwt.JwtTokenService;
 import java.time.Instant;
@@ -53,7 +54,8 @@ class AuthServiceTest {
                 passwordEncoder,
                 createLoginAttemptService(),
                 jwtTokenService,
-                jwtProperties
+                jwtProperties,
+                Mockito.mock(SecurityAuditService.class)
         );
 
         AuthLoginResponse response = authService.login(new AuthLoginRequest("owner", "owner123"));
@@ -110,7 +112,8 @@ class AuthServiceTest {
                 passwordEncoder,
                 createLoginAttemptService(),
                 jwtTokenService,
-                jwtProperties
+                jwtProperties,
+                Mockito.mock(SecurityAuditService.class)
         );
 
         assertThatThrownBy(() -> authService.login(new AuthLoginRequest(" ", " ")))
@@ -143,7 +146,8 @@ class AuthServiceTest {
                 passwordEncoder,
                 createLoginAttemptService(),
                 jwtTokenService,
-                jwtProperties
+                jwtProperties,
+                Mockito.mock(SecurityAuditService.class)
         );
 
         AuthLoginResponse response = authService.refresh(new AuthRefreshRequest("raw-refresh-token"));
@@ -168,7 +172,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("owner123", "hashed")).thenReturn(true);
         when(passwordEncoder.encode("newPassword123")).thenReturn("new-hash");
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties);
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         authService.changePassword("owner", new AuthChangePasswordRequest("owner123", "newPassword123"));
 
@@ -188,7 +192,7 @@ class AuthServiceTest {
         when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties);
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         assertThatThrownBy(() -> authService.changePassword("owner", new AuthChangePasswordRequest("wrong", "newPassword123")))
                 .isInstanceOf(BadCredentialsException.class);
@@ -214,7 +218,8 @@ class AuthServiceTest {
                 passwordEncoder,
                 loginAttemptService,
                 jwtTokenService,
-                jwtProperties
+                jwtProperties,
+                Mockito.mock(SecurityAuditService.class)
         );
     }
 

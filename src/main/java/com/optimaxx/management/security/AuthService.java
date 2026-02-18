@@ -8,6 +8,8 @@ import com.optimaxx.management.interfaces.rest.dto.AuthChangePasswordRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginResponse;
 import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
+import com.optimaxx.management.security.audit.AuditEventType;
+import com.optimaxx.management.security.audit.SecurityAuditService;
 import com.optimaxx.management.security.jwt.JwtProperties;
 import com.optimaxx.management.security.jwt.JwtTokenService;
 import java.nio.charset.StandardCharsets;
@@ -35,6 +37,7 @@ public class AuthService {
     private final LoginAttemptService loginAttemptService;
     private final JwtTokenService jwtTokenService;
     private final JwtProperties jwtProperties;
+    private final SecurityAuditService securityAuditService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     public AuthService(UserRepository userRepository,
@@ -42,13 +45,15 @@ public class AuthService {
                        PasswordEncoder passwordEncoder,
                        LoginAttemptService loginAttemptService,
                        JwtTokenService jwtTokenService,
-                       JwtProperties jwtProperties) {
+                       JwtProperties jwtProperties,
+                       SecurityAuditService securityAuditService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.loginAttemptService = loginAttemptService;
         this.jwtTokenService = jwtTokenService;
         this.jwtProperties = jwtProperties;
+        this.securityAuditService = securityAuditService;
     }
 
     @Transactional
@@ -58,20 +63,28 @@ public class AuthService {
         }
 
         String normalizedUsername = request.username().trim();
-        loginAttemptService.checkBlocked(normalizedUsername);
+        try {
+            loginAttemptService.checkBlocked(normalizedUsername);
+        } catch (ResponseStatusException ex) {
+            securityAuditService.log(AuditEventType.LOGIN_BLOCKED, null, "AUTH", normalizedUsername, "{\"status\":\"blocked\"}");
+            throw ex;
+        }
 
         User user = userRepository.findByUsernameAndDeletedFalse(normalizedUsername)
                 .orElseThrow(() -> {
                     loginAttemptService.onFailedAttempt(normalizedUsername);
+                    securityAuditService.log(AuditEventType.LOGIN_FAILED, null, "AUTH", normalizedUsername, "{\"reason\":\"user-not-found\"}");
                     return new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
                 });
 
         if (!isUserEligible(user) || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             loginAttemptService.onFailedAttempt(normalizedUsername);
+            securityAuditService.log(AuditEventType.LOGIN_FAILED, user, "AUTH", normalizedUsername, "{\"reason\":\"invalid-credentials\"}");
             throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
         loginAttemptService.onSuccessfulAttempt(normalizedUsername);
+        securityAuditService.log(AuditEventType.LOGIN_SUCCESS, user, "AUTH", normalizedUsername, "{\"status\":\"success\"}");
         return issueTokenPair(user);
     }
 
@@ -95,6 +108,7 @@ public class AuthService {
 
         refreshToken.setRevoked(true);
         refreshToken.setRevokedAt(now);
+        securityAuditService.log(AuditEventType.TOKEN_REFRESHED, user, "AUTH", user.getUsername(), "{\"status\":\"rotated\"}");
 
         return issueTokenPair(user);
     }
@@ -110,6 +124,13 @@ public class AuthService {
                 .ifPresent(token -> {
                     token.setRevoked(true);
                     token.setRevokedAt(Instant.now());
+                    securityAuditService.log(
+                            AuditEventType.LOGOUT,
+                            token.getUser(),
+                            "AUTH",
+                            token.getUser().getUsername(),
+                            "{\"status\":\"revoked\"}"
+                    );
                 });
     }
 
@@ -131,6 +152,7 @@ public class AuthService {
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        securityAuditService.log(AuditEventType.PASSWORD_CHANGED, user, "AUTH", user.getUsername(), "{\"status\":\"updated\"}");
     }
 
     private AuthLoginResponse issueTokenPair(User user) {

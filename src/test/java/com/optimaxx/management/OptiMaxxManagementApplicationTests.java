@@ -1,5 +1,6 @@
 package com.optimaxx.management;
 
+import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,9 @@ class OptiMaxxManagementApplicationTests {
 
     @MockitoBean
     private RefreshTokenRepository refreshTokenRepository;
+
+    @MockitoBean
+    private ActivityLogRepository activityLogRepository;
 
     @Test
     void contextLoads() {
