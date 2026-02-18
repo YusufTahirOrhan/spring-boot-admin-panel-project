@@ -24,6 +24,7 @@ security:
   jwt:
     secret-key: ${JWT_SECRET_KEY}
     access-token-minutes: ${JWT_ACCESS_MINUTES:60}
+    refresh-token-minutes: ${JWT_REFRESH_MINUTES:10080}
     issuer: optimaxx-prod
 
 management:

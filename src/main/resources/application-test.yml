@@ -24,6 +24,7 @@ security:
   jwt:
     secret-key: test-secret-key
     access-token-minutes: 15
+    refresh-token-minutes: 60
     issuer: optimaxx-test
 
 logging:

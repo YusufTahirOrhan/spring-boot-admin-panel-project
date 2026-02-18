@@ -27,6 +27,7 @@ security:
   jwt:
     secret-key: dev-change-me-very-long-secret-key
     access-token-minutes: 60
+    refresh-token-minutes: 10080
     issuer: optimaxx-dev
 
 logging:
