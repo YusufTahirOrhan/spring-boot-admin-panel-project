@@ -1,10 +1,10 @@
-FROM gradle:8.14.3-jdk21 AS builder
+FROM maven:3.9.9-eclipse-temurin-25 AS builder
 WORKDIR /app
 COPY . .
-RUN gradle clean bootJar --no-daemon
+RUN ./mvnw clean package -DskipTests
 
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:25-jre
 WORKDIR /app
-COPY --from=builder /app/build/libs/*.jar app.jar
+COPY --from=builder /app/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
