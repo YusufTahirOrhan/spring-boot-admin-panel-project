@@ -1,5 +1,6 @@
 package com.optimaxx.management;
 
+import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +21,9 @@ class OptiMaxxManagementApplicationTests {
 
     @MockitoBean
     private PasswordEncoder passwordEncoder;
+
+    @MockitoBean
+    private RefreshTokenRepository refreshTokenRepository;
 
     @Test
     void contextLoads() {
