@@ -32,6 +32,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
+    private final LoginAttemptService loginAttemptService;
     private final JwtTokenService jwtTokenService;
     private final JwtProperties jwtProperties;
     private final SecureRandom secureRandom = new SecureRandom();
@@ -39,11 +40,13 @@ public class AuthService {
     public AuthService(UserRepository userRepository,
                        RefreshTokenRepository refreshTokenRepository,
                        PasswordEncoder passwordEncoder,
+                       LoginAttemptService loginAttemptService,
                        JwtTokenService jwtTokenService,
                        JwtProperties jwtProperties) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
+        this.loginAttemptService = loginAttemptService;
         this.jwtTokenService = jwtTokenService;
         this.jwtProperties = jwtProperties;
     }
@@ -55,13 +58,20 @@ public class AuthService {
         }
 
         String normalizedUsername = request.username().trim();
+        loginAttemptService.checkBlocked(normalizedUsername);
+
         User user = userRepository.findByUsernameAndDeletedFalse(normalizedUsername)
-                .orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE));
+                .orElseThrow(() -> {
+                    loginAttemptService.onFailedAttempt(normalizedUsername);
+                    return new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+                });
 
         if (!isUserEligible(user) || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            loginAttemptService.onFailedAttempt(normalizedUsername);
             throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
+        loginAttemptService.onSuccessfulAttempt(normalizedUsername);
         return issueTokenPair(user);
     }
 

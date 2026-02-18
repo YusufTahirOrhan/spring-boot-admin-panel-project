@@ -18,6 +18,8 @@ import com.optimaxx.management.interfaces.rest.dto.AuthLoginRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginResponse;
 import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
 import com.optimaxx.management.security.AuthService;
+import com.optimaxx.management.security.LoginAttemptService;
+import com.optimaxx.management.security.LoginProtectionProperties;
 import com.optimaxx.management.security.jwt.JwtProperties;
 import com.optimaxx.management.security.jwt.JwtTokenService;
 import java.time.Instant;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.web.server.ResponseStatusException;
 
 class AuthServiceTest {
 
@@ -47,6 +50,7 @@ class AuthServiceTest {
                 userRepository,
                 refreshTokenRepository,
                 passwordEncoder,
+                createLoginAttemptService(),
                 jwtTokenService,
                 jwtProperties
         );
@@ -65,6 +69,19 @@ class AuthServiceTest {
 
         assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong")))
                 .isInstanceOf(BadCredentialsException.class);
+    }
+
+    @Test
+    void shouldLockUserAfterRepeatedFailedAttempts() {
+        AuthService authService = createAuthServiceReturning(Optional.empty(), new LoginAttemptService(new LoginProtectionProperties(2, 1)));
+
+        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong1")))
+                .isInstanceOf(BadCredentialsException.class);
+        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong2")))
+                .isInstanceOf(BadCredentialsException.class);
+
+        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong3")))
+                .isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
@@ -90,6 +107,7 @@ class AuthServiceTest {
                 userRepository,
                 refreshTokenRepository,
                 passwordEncoder,
+                createLoginAttemptService(),
                 jwtTokenService,
                 jwtProperties
         );
@@ -122,6 +140,7 @@ class AuthServiceTest {
                 userRepository,
                 refreshTokenRepository,
                 passwordEncoder,
+                createLoginAttemptService(),
                 jwtTokenService,
                 jwtProperties
         );
@@ -148,7 +167,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("owner123", "hashed")).thenReturn(true);
         when(passwordEncoder.encode("newPassword123")).thenReturn("new-hash");
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, jwtTokenService, jwtProperties);
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties);
 
         authService.changePassword("owner", new AuthChangePasswordRequest("owner123", "newPassword123"));
 
@@ -168,13 +187,17 @@ class AuthServiceTest {
         when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, jwtTokenService, jwtProperties);
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties);
 
         assertThatThrownBy(() -> authService.changePassword("owner", new AuthChangePasswordRequest("wrong", "newPassword123")))
                 .isInstanceOf(BadCredentialsException.class);
     }
 
     private AuthService createAuthServiceReturning(Optional<User> userOptional) {
+        return createAuthServiceReturning(userOptional, createLoginAttemptService());
+    }
+
+    private AuthService createAuthServiceReturning(Optional<User> userOptional, LoginAttemptService loginAttemptService) {
         JwtProperties jwtProperties = new JwtProperties("this-is-a-very-long-dev-secret-key-for-tests-123456", 60, 120, "test");
         JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);
 
@@ -188,9 +211,14 @@ class AuthServiceTest {
                 userRepository,
                 refreshTokenRepository,
                 passwordEncoder,
+                loginAttemptService,
                 jwtTokenService,
                 jwtProperties
         );
+    }
+
+    private LoginAttemptService createLoginAttemptService() {
+        return new LoginAttemptService(new LoginProtectionProperties(5, 15));
     }
 
     private User createActiveUser() {

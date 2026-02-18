@@ -14,6 +14,7 @@ import com.optimaxx.management.domain.model.User;
 import com.optimaxx.management.domain.model.UserRole;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
+import com.optimaxx.management.security.LoginAttemptService;
 import com.optimaxx.management.security.jwt.JwtTokenService;
 import java.time.Instant;
 import java.util.Map;
@@ -48,6 +49,9 @@ class AuthIntegrationTest {
     @Autowired
     private JwtTokenService jwtTokenService;
 
+    @Autowired
+    private LoginAttemptService loginAttemptService;
+
     @MockitoBean
     private UserRepository userRepository;
 
@@ -67,6 +71,7 @@ class AuthIntegrationTest {
                 .build();
 
         refreshTokenStore.clear();
+        loginAttemptService.clearAll();
 
         when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(invocation -> {
             RefreshToken token = invocation.getArgument(0);
@@ -163,6 +168,37 @@ class AuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(logoutBody))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldReturnTooManyRequestsAfterRepeatedInvalidLogins() throws Exception {
+        User owner = new User();
+        owner.setUsername("owner");
+        owner.setEmail("owner@optimaxx.local");
+        owner.setPasswordHash("hashed-pass");
+        owner.setRole(UserRole.OWNER);
+        owner.setActive(true);
+        owner.setDeleted(false);
+        owner.setStoreId(UUID.randomUUID());
+
+        when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(owner));
+        when(passwordEncoder.matches("wrong", "hashed-pass")).thenReturn(false);
+
+        String loginBody = """
+                {"username":"owner","password":"wrong"}
+                """;
+
+        for (int i = 0; i < 5; i++) {
+            mockMvc.perform(post("/api/v1/auth/login")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(loginBody))
+                    .andExpect(status().isUnauthorized());
+        }
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody))
+                .andExpect(status().isTooManyRequests());
     }
 
     @Test
