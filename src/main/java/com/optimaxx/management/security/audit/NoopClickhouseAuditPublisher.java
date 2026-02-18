@@ -15,6 +15,8 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicLong;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -29,14 +31,25 @@ public class NoopClickhouseAuditPublisher implements ClickhouseAuditPublisher {
     private final HttpClient httpClient;
     private final Queue<PendingAudit> retryQueue = new ConcurrentLinkedQueue<>();
     private final AtomicLong droppedCount = new AtomicLong(0);
+    private final AtomicLong publishFailureCount = new AtomicLong(0);
+    private final AtomicLong retryAttemptCount = new AtomicLong(0);
+    private final AtomicLong publishedSuccessCount = new AtomicLong(0);
 
     public NoopClickhouseAuditPublisher(ClickhouseProperties clickhouseProperties,
-                                        ClickhouseAuditRetryProperties retryProperties) {
+                                        ClickhouseAuditRetryProperties retryProperties,
+                                        MeterRegistry meterRegistry) {
         this.clickhouseProperties = clickhouseProperties;
         this.retryProperties = retryProperties;
         this.httpClient = HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(2))
                 .build();
+
+        Gauge.builder("optimaxx.audit.retry.queue.size", this, NoopClickhouseAuditPublisher::getPendingQueueSize)
+                .description("Pending audit events waiting for ClickHouse retry")
+                .register(meterRegistry);
+        Gauge.builder("optimaxx.audit.retry.dropped.count", this, p -> p.getDroppedCount())
+                .description("Dropped audit events in retry buffer")
+                .register(meterRegistry);
     }
 
     @Override
@@ -60,6 +73,7 @@ public class NoopClickhouseAuditPublisher implements ClickhouseAuditPublisher {
                 return;
             }
 
+            retryAttemptCount.incrementAndGet();
             boolean success = sendPayload(pending.payload());
             if (!success) {
                 int nextAttempt = pending.attempts() + 1;
@@ -79,6 +93,18 @@ public class NoopClickhouseAuditPublisher implements ClickhouseAuditPublisher {
 
     public long getDroppedCount() {
         return droppedCount.get();
+    }
+
+    public long getPublishFailureCount() {
+        return publishFailureCount.get();
+    }
+
+    public long getRetryAttemptCount() {
+        return retryAttemptCount.get();
+    }
+
+    public long getPublishedSuccessCount() {
+        return publishedSuccessCount.get();
     }
 
     private void enqueue(String payload, int attempts) {
@@ -109,14 +135,17 @@ public class NoopClickhouseAuditPublisher implements ClickhouseAuditPublisher {
 
             HttpResponse<String> response = httpClient.send(requestBuilder.build(), HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 300) {
+                publishFailureCount.incrementAndGet();
                 log.warn("ClickHouse audit publish failed with status {}: {}", response.statusCode(), response.body());
                 return false;
             }
+            publishedSuccessCount.incrementAndGet();
             return true;
         } catch (IOException | InterruptedException ex) {
             if (ex instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
+            publishFailureCount.incrementAndGet();
             log.warn("ClickHouse audit publish failed: {}", ex.getMessage());
             return false;
         }
