@@ -4,6 +4,7 @@ import com.optimaxx.management.domain.model.RefreshToken;
 import com.optimaxx.management.domain.model.User;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
+import com.optimaxx.management.interfaces.rest.dto.AuthChangePasswordRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginResponse;
 import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
@@ -16,10 +17,12 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class AuthService {
@@ -98,6 +101,26 @@ public class AuthService {
                     token.setRevoked(true);
                     token.setRevokedAt(Instant.now());
                 });
+    }
+
+    @Transactional
+    public void changePassword(String username, AuthChangePasswordRequest request) {
+        if (isBlank(username) || request == null || isBlank(request.currentPassword()) || isBlank(request.newPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Current password and new password are required");
+        }
+
+        if (request.newPassword().length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be at least 8 characters");
+        }
+
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
     }
 
     private AuthLoginResponse issueTokenPair(User user) {

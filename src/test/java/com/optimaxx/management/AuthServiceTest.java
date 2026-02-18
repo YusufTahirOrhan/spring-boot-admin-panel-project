@@ -13,6 +13,7 @@ import com.optimaxx.management.domain.model.User;
 import com.optimaxx.management.domain.model.UserRole;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
+import com.optimaxx.management.interfaces.rest.dto.AuthChangePasswordRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginResponse;
 import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
@@ -131,6 +132,46 @@ class AuthServiceTest {
         assertThat(response.refreshToken()).isNotBlank();
         assertThat(existingToken.isRevoked()).isTrue();
         verify(refreshTokenRepository).save(any(RefreshToken.class));
+    }
+
+    @Test
+    void shouldChangePasswordWhenCurrentPasswordMatches() {
+        JwtProperties jwtProperties = new JwtProperties("this-is-a-very-long-dev-secret-key-for-tests-123456", 60, 120, "test");
+        JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);
+
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
+
+        User user = createActiveUser();
+        when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("owner123", "hashed")).thenReturn(true);
+        when(passwordEncoder.encode("newPassword123")).thenReturn("new-hash");
+
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, jwtTokenService, jwtProperties);
+
+        authService.changePassword("owner", new AuthChangePasswordRequest("owner123", "newPassword123"));
+
+        assertThat(user.getPasswordHash()).isEqualTo("new-hash");
+    }
+
+    @Test
+    void shouldRejectPasswordChangeWhenCurrentPasswordIsInvalid() {
+        JwtProperties jwtProperties = new JwtProperties("this-is-a-very-long-dev-secret-key-for-tests-123456", 60, 120, "test");
+        JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);
+
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
+
+        User user = createActiveUser();
+        when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
+
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, jwtTokenService, jwtProperties);
+
+        assertThatThrownBy(() -> authService.changePassword("owner", new AuthChangePasswordRequest("wrong", "newPassword123")))
+                .isInstanceOf(BadCredentialsException.class);
     }
 
     private AuthService createAuthServiceReturning(Optional<User> userOptional) {
