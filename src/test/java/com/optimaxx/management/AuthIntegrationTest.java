@@ -129,6 +129,7 @@ class AuthIntegrationTest {
                 """;
 
         String loginResponseBody = mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Device-Id", "device-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody))
                 .andExpect(status().isOk())
@@ -145,6 +146,7 @@ class AuthIntegrationTest {
                 """.formatted(refreshToken);
 
         String rotatedResponseBody = mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header("X-Device-Id", "device-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(refreshBody))
                 .andExpect(status().isOk())
@@ -154,6 +156,7 @@ class AuthIntegrationTest {
                 .getContentAsString();
 
         mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header("X-Device-Id", "device-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(refreshBody))
                 .andExpect(status().isUnauthorized());
@@ -164,11 +167,13 @@ class AuthIntegrationTest {
                 """.formatted(rotatedRefreshToken);
 
         mockMvc.perform(post("/api/v1/auth/logout")
+                        .header("X-Device-Id", "device-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(logoutBody))
                 .andExpect(status().isNoContent());
 
         mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header("X-Device-Id", "device-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(logoutBody))
                 .andExpect(status().isUnauthorized());
@@ -194,12 +199,14 @@ class AuthIntegrationTest {
 
         for (int i = 0; i < 5; i++) {
             mockMvc.perform(post("/api/v1/auth/login")
+                            .header("X-Device-Id", "device-1")
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(loginBody))
                     .andExpect(status().isUnauthorized());
         }
 
         mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Device-Id", "device-1")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(loginBody))
                 .andExpect(status().isTooManyRequests());
@@ -217,6 +224,26 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.publishFailureCount").exists())
                 .andExpect(jsonPath("$.retryAttemptCount").exists())
                 .andExpect(jsonPath("$.publishedSuccessCount").exists());
+    }
+
+
+    @Test
+    void shouldLogoutAllDevicesForAuthenticatedUser() throws Exception {
+        String ownerToken = jwtTokenService.generateAccessToken("owner", "OWNER");
+
+        User owner = new User();
+        owner.setUsername("owner");
+        owner.setRole(UserRole.OWNER);
+        owner.setStoreId(UUID.randomUUID());
+        owner.setDeleted(false);
+
+        when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(owner));
+        when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
+                .thenReturn(java.util.List.of());
+
+        mockMvc.perform(post("/api/v1/auth/logout-all")
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isNoContent());
     }
 
     @Test

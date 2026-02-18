@@ -19,6 +19,7 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HexFormat;
+import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,6 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class AuthService {
 
     private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid credentials";
+    private static final String UNKNOWN_DEVICE = "unknown-device";
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -57,7 +59,7 @@ public class AuthService {
     }
 
     @Transactional
-    public AuthLoginResponse login(AuthLoginRequest request) {
+    public AuthLoginResponse login(AuthLoginRequest request, String deviceId, String userAgent, String ipAddress) {
         if (request == null || isBlank(request.username()) || isBlank(request.password())) {
             throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
@@ -85,11 +87,11 @@ public class AuthService {
 
         loginAttemptService.onSuccessfulAttempt(normalizedUsername);
         securityAuditService.log(AuditEventType.LOGIN_SUCCESS, user, "AUTH", normalizedUsername, "{\"status\":\"success\"}");
-        return issueTokenPair(user);
+        return issueTokenPair(user, deviceId, userAgent, ipAddress);
     }
 
     @Transactional
-    public AuthLoginResponse refresh(AuthRefreshRequest request) {
+    public AuthLoginResponse refresh(AuthRefreshRequest request, String deviceId, String userAgent, String ipAddress) {
         if (request == null || isBlank(request.refreshToken())) {
             throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
@@ -102,7 +104,7 @@ public class AuthService {
                 .orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE));
 
         User user = refreshToken.getUser();
-        if (!isUserEligible(user)) {
+        if (!isUserEligible(user) || !normalizeDeviceId(deviceId).equals(refreshToken.getDeviceId())) {
             throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
@@ -110,11 +112,11 @@ public class AuthService {
         refreshToken.setRevokedAt(now);
         securityAuditService.log(AuditEventType.TOKEN_REFRESHED, user, "AUTH", user.getUsername(), "{\"status\":\"rotated\"}");
 
-        return issueTokenPair(user);
+        return issueTokenPair(user, deviceId, userAgent, ipAddress);
     }
 
     @Transactional
-    public void logout(String refreshTokenValue) {
+    public void logout(String refreshTokenValue, String deviceId) {
         if (isBlank(refreshTokenValue)) {
             return;
         }
@@ -122,6 +124,9 @@ public class AuthService {
         refreshTokenRepository
                 .findByTokenHashAndRevokedFalseAndExpiresAtAfter(hashToken(refreshTokenValue), Instant.now())
                 .ifPresent(token -> {
+                    if (!normalizeDeviceId(deviceId).equals(token.getDeviceId())) {
+                        return;
+                    }
                     token.setRevoked(true);
                     token.setRevokedAt(Instant.now());
                     securityAuditService.log(
@@ -129,9 +134,35 @@ public class AuthService {
                             token.getUser(),
                             "AUTH",
                             token.getUser().getUsername(),
-                            "{\"status\":\"revoked\"}"
+                            "{\"status\":\"revoked-this-device\"}"
                     );
                 });
+    }
+
+    @Transactional
+    public void logoutAllDevices(String username) {
+        if (isBlank(username)) {
+            return;
+        }
+
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        List<RefreshToken> activeTokens = refreshTokenRepository
+                .findByUserAndRevokedFalseAndExpiresAtAfter(user, Instant.now());
+
+        for (RefreshToken token : activeTokens) {
+            token.setRevoked(true);
+            token.setRevokedAt(Instant.now());
+        }
+
+        securityAuditService.log(
+                AuditEventType.LOGOUT,
+                user,
+                "AUTH",
+                user.getUsername(),
+                "{\"status\":\"revoked-all-devices\",\"count\":" + activeTokens.size() + "}"
+        );
     }
 
     @Transactional
@@ -155,13 +186,16 @@ public class AuthService {
         securityAuditService.log(AuditEventType.PASSWORD_CHANGED, user, "AUTH", user.getUsername(), "{\"status\":\"updated\"}");
     }
 
-    private AuthLoginResponse issueTokenPair(User user) {
+    private AuthLoginResponse issueTokenPair(User user, String deviceId, String userAgent, String ipAddress) {
         String role = user.getRole().name();
         String accessToken = jwtTokenService.generateAccessToken(user.getUsername(), role);
         String refreshToken = generateOpaqueToken();
 
         RefreshToken refreshTokenEntity = new RefreshToken();
         refreshTokenEntity.setUser(user);
+        refreshTokenEntity.setDeviceId(normalizeDeviceId(deviceId));
+        refreshTokenEntity.setUserAgent(isBlank(userAgent) ? null : userAgent);
+        refreshTokenEntity.setIpAddress(isBlank(ipAddress) ? null : ipAddress);
         refreshTokenEntity.setTokenHash(hashToken(refreshToken));
         refreshTokenEntity.setExpiresAt(Instant.now().plus(jwtProperties.refreshTokenMinutes(), ChronoUnit.MINUTES));
         refreshTokenEntity.setRevoked(false);
@@ -194,6 +228,13 @@ public class AuthService {
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException("SHA-256 algorithm is not available", ex);
         }
+    }
+
+    private String normalizeDeviceId(String deviceId) {
+        if (isBlank(deviceId)) {
+            return UNKNOWN_DEVICE;
+        }
+        return deviceId.trim();
     }
 
     private boolean isBlank(String value) {

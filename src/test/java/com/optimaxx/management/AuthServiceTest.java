@@ -58,7 +58,7 @@ class AuthServiceTest {
                 Mockito.mock(SecurityAuditService.class)
         );
 
-        AuthLoginResponse response = authService.login(new AuthLoginRequest("owner", "owner123"));
+        AuthLoginResponse response = authService.login(new AuthLoginRequest("owner", "owner123"), "device-1", null, null);
 
         assertThat(response.accessToken()).isNotBlank();
         assertThat(response.refreshToken()).isNotBlank();
@@ -70,7 +70,7 @@ class AuthServiceTest {
     void shouldRejectInvalidCredentialsWhenUserNotFound() {
         AuthService authService = createAuthServiceReturning(Optional.empty());
 
-        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong")))
+        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong"), "device-1", null, null))
                 .isInstanceOf(BadCredentialsException.class);
     }
 
@@ -78,12 +78,12 @@ class AuthServiceTest {
     void shouldLockUserAfterRepeatedFailedAttempts() {
         AuthService authService = createAuthServiceReturning(Optional.empty(), createLoginAttemptService(2, 1));
 
-        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong1")))
+        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong1"), "device-1", null, null))
                 .isInstanceOf(BadCredentialsException.class);
-        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong2")))
+        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong2"), "device-1", null, null))
                 .isInstanceOf(BadCredentialsException.class);
 
-        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong3")))
+        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong3"), "device-1", null, null))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -94,7 +94,7 @@ class AuthServiceTest {
 
         AuthService authService = createAuthServiceReturning(Optional.of(inactiveUser));
 
-        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "owner123")))
+        assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "owner123"), "device-1", null, null))
                 .isInstanceOf(BadCredentialsException.class);
     }
 
@@ -116,7 +116,7 @@ class AuthServiceTest {
                 Mockito.mock(SecurityAuditService.class)
         );
 
-        assertThatThrownBy(() -> authService.login(new AuthLoginRequest(" ", " ")))
+        assertThatThrownBy(() -> authService.login(new AuthLoginRequest(" ", " "), "device-1", null, null))
                 .isInstanceOf(BadCredentialsException.class);
 
         verify(userRepository, never()).findByUsernameAndDeletedFalse(anyString());
@@ -135,6 +135,7 @@ class AuthServiceTest {
         RefreshToken existingToken = new RefreshToken();
         existingToken.setUser(user);
         existingToken.setRevoked(false);
+        existingToken.setDeviceId("device-1");
         existingToken.setExpiresAt(Instant.now().plusSeconds(3600));
 
         when(refreshTokenRepository.findByTokenHashAndRevokedFalseAndExpiresAtAfter(anyString(), any(Instant.class)))
@@ -150,7 +151,7 @@ class AuthServiceTest {
                 Mockito.mock(SecurityAuditService.class)
         );
 
-        AuthLoginResponse response = authService.refresh(new AuthRefreshRequest("raw-refresh-token"));
+        AuthLoginResponse response = authService.refresh(new AuthRefreshRequest("raw-refresh-token"), "device-1", null, null);
 
         assertThat(response.accessToken()).isNotBlank();
         assertThat(response.refreshToken()).isNotBlank();
