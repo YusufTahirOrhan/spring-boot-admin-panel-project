@@ -8,6 +8,7 @@ import com.optimaxx.management.interfaces.rest.dto.AuthChangePasswordRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginResponse;
 import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
+import com.optimaxx.management.interfaces.rest.dto.DeviceSessionResponse;
 import com.optimaxx.management.security.audit.AuditEventType;
 import com.optimaxx.management.security.audit.SecurityAuditService;
 import com.optimaxx.management.security.jwt.JwtProperties;
@@ -18,6 +19,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -162,6 +164,57 @@ public class AuthService {
                 "AUTH",
                 user.getUsername(),
                 "{\"status\":\"revoked-all-devices\",\"count\":" + activeTokens.size() + "}"
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public List<DeviceSessionResponse> listDeviceSessions(String username, String currentDeviceId) {
+        if (isBlank(username)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username is required");
+        }
+
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        String normalizedCurrentDeviceId = normalizeDeviceId(currentDeviceId);
+
+        return refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(user, Instant.now())
+                .stream()
+                .sorted(Comparator.comparing(RefreshToken::getCreatedAt).reversed())
+                .map(token -> new DeviceSessionResponse(
+                        token.getDeviceId(),
+                        token.getUserAgent(),
+                        token.getIpAddress(),
+                        token.getCreatedAt(),
+                        token.getExpiresAt(),
+                        token.getDeviceId().equals(normalizedCurrentDeviceId)
+                ))
+                .toList();
+    }
+
+    @Transactional
+    public void logoutDevice(String username, String targetDeviceId) {
+        if (isBlank(username) || isBlank(targetDeviceId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Username and target device are required");
+        }
+
+        User user = userRepository.findByUsernameAndDeletedFalse(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        List<RefreshToken> deviceTokens = refreshTokenRepository
+                .findByUserAndDeviceIdAndRevokedFalseAndExpiresAtAfter(user, targetDeviceId.trim(), Instant.now());
+
+        for (RefreshToken token : deviceTokens) {
+            token.setRevoked(true);
+            token.setRevokedAt(Instant.now());
+        }
+
+        securityAuditService.log(
+                AuditEventType.DEVICE_SESSION_REVOKED,
+                user,
+                "AUTH",
+                user.getUsername(),
+                "{\"deviceId\":\"" + targetDeviceId.trim() + "\",\"count\":" + deviceTokens.size() + "}"
         );
     }
 

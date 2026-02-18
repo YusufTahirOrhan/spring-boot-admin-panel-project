@@ -181,6 +181,59 @@ class AuthServiceTest {
     }
 
     @Test
+    void shouldListDeviceSessionsForUser() {
+        JwtProperties jwtProperties = new JwtProperties("this-is-a-very-long-dev-secret-key-for-tests-123456", 60, 120, "test");
+        JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);
+
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
+
+        User user = createActiveUser();
+        when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(user));
+
+        RefreshToken token = new RefreshToken();
+        token.setUser(user);
+        token.setDeviceId("device-1");
+        token.setExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
+                .thenReturn(java.util.List.of(token));
+
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+
+        assertThat(authService.listDeviceSessions("owner", "device-1")).hasSize(1);
+    }
+
+    @Test
+    void shouldLogoutSpecificDevice() {
+        JwtProperties jwtProperties = new JwtProperties("this-is-a-very-long-dev-secret-key-for-tests-123456", 60, 120, "test");
+        JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);
+
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
+
+        User user = createActiveUser();
+        when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(user));
+
+        RefreshToken token = new RefreshToken();
+        token.setUser(user);
+        token.setDeviceId("device-1");
+        token.setRevoked(false);
+        token.setExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(refreshTokenRepository.findByUserAndDeviceIdAndRevokedFalseAndExpiresAtAfter(any(User.class), anyString(), any(Instant.class)))
+                .thenReturn(java.util.List.of(token));
+
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+
+        authService.logoutDevice("owner", "device-1");
+
+        assertThat(token.isRevoked()).isTrue();
+    }
+
+    @Test
     void shouldRejectPasswordChangeWhenCurrentPasswordIsInvalid() {
         JwtProperties jwtProperties = new JwtProperties("this-is-a-very-long-dev-secret-key-for-tests-123456", 60, 120, "test");
         JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);

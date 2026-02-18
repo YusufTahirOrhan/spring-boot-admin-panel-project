@@ -5,9 +5,13 @@ import com.optimaxx.management.interfaces.rest.dto.AuthLoginRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginResponse;
 import com.optimaxx.management.interfaces.rest.dto.AuthLogoutRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
+import com.optimaxx.management.interfaces.rest.dto.DeviceSessionResponse;
+import com.optimaxx.management.interfaces.rest.dto.LogoutDeviceRequest;
 import com.optimaxx.management.security.AuthService;
+import java.util.List;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -50,6 +54,19 @@ public class AuthController {
     @PostMapping("/logout-all")
     public ResponseEntity<Void> logoutAll(Authentication authentication) {
         authService.logoutAllDevices(authentication == null ? null : authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/devices")
+    public List<DeviceSessionResponse> listDevices(Authentication authentication,
+                                                   @RequestHeader(value = "X-Device-Id", required = false) String currentDeviceId) {
+        return authService.listDeviceSessions(authentication == null ? null : authentication.getName(), currentDeviceId);
+    }
+
+    @PostMapping("/logout-device")
+    public ResponseEntity<Void> logoutDevice(@RequestBody LogoutDeviceRequest request,
+                                             Authentication authentication) {
+        authService.logoutDevice(authentication == null ? null : authentication.getName(), request == null ? null : request.deviceId());
         return ResponseEntity.noContent().build();
     }
 
