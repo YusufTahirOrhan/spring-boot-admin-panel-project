@@ -2,8 +2,31 @@ spring:
   config:
     activate:
       on-profile: test
+  datasource:
+    url: jdbc:tc:postgresql:17:///optimaxx_test
+    username: test
+    password: test
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+clickhouse:
+  url: jdbc:clickhouse://localhost:8123/default
+  username: default
+  password: ""
+
+security:
+  jwt:
+    secret-key: test-secret-key
+    access-token-minutes: 15
+    issuer: optimaxx-test
 
 logging:
   level:
     root: WARN
-    com.yusuf.adminpanel: INFO
+    com.optimaxx.management: INFO
