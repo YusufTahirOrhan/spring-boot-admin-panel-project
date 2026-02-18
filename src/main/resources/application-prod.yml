@@ -26,6 +26,9 @@ security:
     access-token-minutes: ${JWT_ACCESS_MINUTES:60}
     refresh-token-minutes: ${JWT_REFRESH_MINUTES:10080}
     issuer: optimaxx-prod
+  login-protection:
+    max-failures: ${LOGIN_MAX_FAILURES:5}
+    lock-minutes: ${LOGIN_LOCK_MINUTES:15}
 
 management:
   endpoint:

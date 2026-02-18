@@ -26,6 +26,9 @@ security:
     access-token-minutes: 15
     refresh-token-minutes: 60
     issuer: optimaxx-test
+  login-protection:
+    max-failures: 3
+    lock-minutes: 1
 
 logging:
   level:
