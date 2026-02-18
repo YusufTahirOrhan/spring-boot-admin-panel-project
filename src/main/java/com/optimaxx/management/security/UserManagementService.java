@@ -6,6 +6,7 @@ import com.optimaxx.management.domain.repository.UserRepository;
 import com.optimaxx.management.interfaces.rest.dto.AdminCreateUserRequest;
 import com.optimaxx.management.interfaces.rest.dto.UserResponse;
 import jakarta.annotation.PostConstruct;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
@@ -109,6 +111,34 @@ public class UserManagementService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "User not found"));
         user.setActive(active);
         return toResponse(user);
+    }
+
+    @Transactional
+    public void softDeleteUser(UUID userId, String actorUsername) {
+        User targetUser = userRepository.findByIdAndDeletedFalse(userId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "User not found"));
+
+        if (isBlank(actorUsername)) {
+            throw new ResponseStatusException(FORBIDDEN, "Actor user is required");
+        }
+
+        User actorUser = userRepository.findByUsernameAndDeletedFalse(actorUsername)
+                .orElseThrow(() -> new ResponseStatusException(FORBIDDEN, "Actor user not found"));
+
+        boolean sameUser = (targetUser.getId() != null && targetUser.getId().equals(actorUser.getId()))
+                || targetUser.getUsername().equalsIgnoreCase(actorUser.getUsername());
+
+        boolean privilegedSelfDelete = sameUser
+                && (actorUser.getRole() == UserRole.ADMIN || actorUser.getRole() == UserRole.OWNER);
+
+        if (privilegedSelfDelete) {
+            throw new ResponseStatusException(FORBIDDEN, "Admin or owner cannot delete their own account");
+        }
+
+        targetUser.setDeleted(true);
+        targetUser.setActive(false);
+        targetUser.setDeletedAt(Instant.now());
+        targetUser.setDeletedBy(actorUser.getId());
     }
 
     private UserResponse toResponse(User user) {
