@@ -3,6 +3,7 @@ package com.optimaxx.management;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.optimaxx.management.domain.model.User;
@@ -83,5 +84,61 @@ class UserManagementServiceTest {
         UserResponse response = service.updateRole(userId, UserRole.ADMIN);
 
         assertThat(response.role()).isEqualTo(UserRole.ADMIN);
+    }
+
+    @Test
+    void shouldSoftDeleteTargetUserWhenActorIsAnotherAdmin() {
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
+        BootstrapOwnerProperties bootstrapOwnerProperties = new BootstrapOwnerProperties(false, null, null, null);
+
+        User actor = new User();
+        actor.setUsername("admin1");
+        actor.setRole(UserRole.ADMIN);
+        actor.setStoreId(UUID.randomUUID());
+        actor.setDeleted(false);
+
+        User target = new User();
+        target.setUsername("staff1");
+        target.setRole(UserRole.STAFF);
+        target.setStoreId(UUID.randomUUID());
+        target.setDeleted(false);
+        target.setActive(true);
+
+        UUID targetId = UUID.randomUUID();
+        when(userRepository.findByIdAndDeletedFalse(targetId)).thenReturn(Optional.of(target));
+        when(userRepository.findByUsernameAndDeletedFalse("admin1")).thenReturn(Optional.of(actor));
+
+        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties);
+
+        service.softDeleteUser(targetId, "admin1");
+
+        assertThat(target.isDeleted()).isTrue();
+        assertThat(target.isActive()).isFalse();
+        assertThat(target.getDeletedAt()).isNotNull();
+    }
+
+    @Test
+    void shouldRejectSelfDeleteForAdminOrOwner() {
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
+        BootstrapOwnerProperties bootstrapOwnerProperties = new BootstrapOwnerProperties(false, null, null, null);
+
+        User actorAndTarget = new User();
+        actorAndTarget.setUsername("owner1");
+        actorAndTarget.setRole(UserRole.OWNER);
+        actorAndTarget.setStoreId(UUID.randomUUID());
+        actorAndTarget.setDeleted(false);
+
+        UUID targetId = UUID.randomUUID();
+        when(userRepository.findByIdAndDeletedFalse(targetId)).thenReturn(Optional.of(actorAndTarget));
+        when(userRepository.findByUsernameAndDeletedFalse("owner1")).thenReturn(Optional.of(actorAndTarget));
+
+        UserManagementService service = new UserManagementService(userRepository, passwordEncoder, bootstrapOwnerProperties);
+
+        assertThatThrownBy(() -> service.softDeleteUser(targetId, "owner1"))
+                .isInstanceOf(ResponseStatusException.class);
+
+        assertThat(actorAndTarget.isDeleted()).isFalse();
     }
 }

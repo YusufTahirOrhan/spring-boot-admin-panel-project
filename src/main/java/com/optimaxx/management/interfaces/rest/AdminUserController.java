@@ -7,6 +7,9 @@ import com.optimaxx.management.interfaces.rest.dto.UserResponse;
 import com.optimaxx.management.security.UserManagementService;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,5 +48,11 @@ public class AdminUserController {
     @PatchMapping("/{userId}/status")
     public UserResponse updateStatus(@PathVariable UUID userId, @RequestBody AdminUpdateUserStatusRequest request) {
         return userManagementService.updateStatus(userId, request != null && request.active());
+    }
+
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<Void> deleteUser(@PathVariable UUID userId, Authentication authentication) {
+        userManagementService.softDeleteUser(userId, authentication == null ? null : authentication.getName());
+        return ResponseEntity.noContent().build();
     }
 }
