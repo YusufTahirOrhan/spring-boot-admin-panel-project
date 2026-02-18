@@ -13,6 +13,8 @@ import org.springframework.stereotype.Service;
 @Service
 public class AuthService {
 
+    private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid credentials";
+
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenService jwtTokenService;
@@ -29,15 +31,25 @@ public class AuthService {
     }
 
     public AuthLoginResponse login(AuthLoginRequest request) {
-        User user = userRepository.findByUsernameAndDeletedFalse(request.username())
-                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
+        if (request == null || isBlank(request.username()) || isBlank(request.password())) {
+            throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
+        }
 
-        if (!user.isActive() || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
-            throw new BadCredentialsException("Invalid credentials");
+        String normalizedUsername = request.username().trim();
+        User user = userRepository.findByUsernameAndDeletedFalse(normalizedUsername)
+                .orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE));
+
+        if (!user.isActive() || user.getRole() == null || isBlank(user.getPasswordHash())
+                || !passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE);
         }
 
         String role = user.getRole().name();
         String token = jwtTokenService.generateAccessToken(user.getUsername(), role);
         return new AuthLoginResponse(token, "Bearer", jwtProperties.accessTokenMinutes(), role);
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
