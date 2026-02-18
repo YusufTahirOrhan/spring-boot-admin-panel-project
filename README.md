@@ -53,6 +53,28 @@ Services:
 - Actuator health: `http://localhost:8080/actuator/health`
 - API health sample: `http://localhost:8080/api/v1/system/health`
 
+## Commit Message Convention
+
+Use English commit messages with this structure:
+
+1. **Subject** (single line, conventional commit format)
+   - Example: `feat: add login rate limit and temporary lockout protection`
+2. **Body** (3-6 bullets)
+   - `Added: ...`
+   - `Updated: ...`
+   - `Tests: ...`
+
+Example:
+
+```text
+feat: add login rate limit and temporary lockout protection
+
+- Added in-memory login attempt tracking with temporary lockout window.
+- Updated AuthService login flow to enforce lock checks and reset attempts on success.
+- Updated API exception handling to return structured 429 responses.
+- Tests: ./mvnw test (passed)
+```
+
 ## Notes
 
 - Soft delete metadata exists in `BaseEntity` (`is_deleted`, `deleted_at`, `deleted_by`).

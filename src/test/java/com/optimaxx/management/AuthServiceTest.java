@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
@@ -73,7 +74,7 @@ class AuthServiceTest {
 
     @Test
     void shouldLockUserAfterRepeatedFailedAttempts() {
-        AuthService authService = createAuthServiceReturning(Optional.empty(), new LoginAttemptService(new LoginProtectionProperties(2, 1)));
+        AuthService authService = createAuthServiceReturning(Optional.empty(), createLoginAttemptService(2, 1));
 
         assertThatThrownBy(() -> authService.login(new AuthLoginRequest("owner", "wrong1")))
                 .isInstanceOf(BadCredentialsException.class);
@@ -218,7 +219,14 @@ class AuthServiceTest {
     }
 
     private LoginAttemptService createLoginAttemptService() {
-        return new LoginAttemptService(new LoginProtectionProperties(5, 15));
+        return createLoginAttemptService(5, 15);
+    }
+
+    private LoginAttemptService createLoginAttemptService(int maxFailures, long lockMinutes) {
+        @SuppressWarnings("unchecked")
+        ObjectProvider<org.springframework.data.redis.core.StringRedisTemplate> redisProvider = Mockito.mock(ObjectProvider.class);
+        when(redisProvider.getIfAvailable()).thenReturn(null);
+        return new LoginAttemptService(new LoginProtectionProperties(maxFailures, lockMinutes), redisProvider);
     }
 
     private User createActiveUser() {
