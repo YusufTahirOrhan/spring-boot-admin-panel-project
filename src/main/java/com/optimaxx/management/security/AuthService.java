@@ -1,7 +1,9 @@
 package com.optimaxx.management.security;
 
+import com.optimaxx.management.domain.model.PasswordResetToken;
 import com.optimaxx.management.domain.model.RefreshToken;
 import com.optimaxx.management.domain.model.User;
+import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
 import com.optimaxx.management.interfaces.rest.dto.AuthChangePasswordRequest;
@@ -9,6 +11,8 @@ import com.optimaxx.management.interfaces.rest.dto.AuthLoginRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthLoginResponse;
 import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
 import com.optimaxx.management.interfaces.rest.dto.DeviceSessionResponse;
+import com.optimaxx.management.interfaces.rest.dto.ForgotPasswordResponse;
+import com.optimaxx.management.interfaces.rest.dto.ResetPasswordRequest;
 import com.optimaxx.management.security.audit.AuditEventType;
 import com.optimaxx.management.security.audit.SecurityAuditService;
 import com.optimaxx.management.security.jwt.JwtProperties;
@@ -34,9 +38,11 @@ public class AuthService {
 
     private static final String INVALID_CREDENTIALS_MESSAGE = "Invalid credentials";
     private static final String UNKNOWN_DEVICE = "unknown-device";
+    private static final long PASSWORD_RESET_EXPIRES_MINUTES = 15;
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final LoginAttemptService loginAttemptService;
     private final JwtTokenService jwtTokenService;
@@ -46,6 +52,7 @@ public class AuthService {
 
     public AuthService(UserRepository userRepository,
                        RefreshTokenRepository refreshTokenRepository,
+                       PasswordResetTokenRepository passwordResetTokenRepository,
                        PasswordEncoder passwordEncoder,
                        LoginAttemptService loginAttemptService,
                        JwtTokenService jwtTokenService,
@@ -53,6 +60,7 @@ public class AuthService {
                        SecurityAuditService securityAuditService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.loginAttemptService = loginAttemptService;
         this.jwtTokenService = jwtTokenService;
@@ -215,6 +223,73 @@ public class AuthService {
                 "AUTH",
                 user.getUsername(),
                 "{\"deviceId\":\"" + targetDeviceId.trim() + "\",\"count\":" + deviceTokens.size() + "}"
+        );
+    }
+
+    @Transactional
+    public ForgotPasswordResponse forgotPassword(String email) {
+        if (isBlank(email)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required");
+        }
+
+        String normalizedEmail = email.trim().toLowerCase();
+        User user = userRepository.findByEmailAndDeletedFalse(normalizedEmail).orElse(null);
+        if (user == null) {
+            return new ForgotPasswordResponse(null, PASSWORD_RESET_EXPIRES_MINUTES);
+        }
+
+        List<PasswordResetToken> activeTokens = passwordResetTokenRepository
+                .findByUserAndUsedFalseAndExpiresAtAfter(user, Instant.now());
+        for (PasswordResetToken token : activeTokens) {
+            token.setUsed(true);
+            token.setUsedAt(Instant.now());
+        }
+
+        String rawToken = generateOpaqueToken();
+        PasswordResetToken resetToken = new PasswordResetToken();
+        resetToken.setUser(user);
+        resetToken.setTokenHash(hashToken(rawToken));
+        resetToken.setUsed(false);
+        resetToken.setExpiresAt(Instant.now().plus(PASSWORD_RESET_EXPIRES_MINUTES, ChronoUnit.MINUTES));
+        passwordResetTokenRepository.save(resetToken);
+
+        securityAuditService.log(AuditEventType.PASSWORD_RESET_REQUESTED, user, "AUTH", user.getUsername(), "{\"status\":\"requested\"}");
+        return new ForgotPasswordResponse(rawToken, PASSWORD_RESET_EXPIRES_MINUTES);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        if (request == null || isBlank(request.resetToken()) || isBlank(request.newPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reset token and new password are required");
+        }
+
+        if (request.newPassword().length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be at least 8 characters");
+        }
+
+        PasswordResetToken token = passwordResetTokenRepository
+                .findByTokenHashAndUsedFalseAndExpiresAtAfter(hashToken(request.resetToken()), Instant.now())
+                .orElseThrow(() -> new BadCredentialsException(INVALID_CREDENTIALS_MESSAGE));
+
+        User user = token.getUser();
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+
+        token.setUsed(true);
+        token.setUsedAt(Instant.now());
+
+        List<RefreshToken> activeTokens = refreshTokenRepository
+                .findByUserAndRevokedFalseAndExpiresAtAfter(user, Instant.now());
+        for (RefreshToken refreshToken : activeTokens) {
+            refreshToken.setRevoked(true);
+            refreshToken.setRevokedAt(Instant.now());
+        }
+
+        securityAuditService.log(
+                AuditEventType.PASSWORD_RESET_COMPLETED,
+                user,
+                "AUTH",
+                user.getUsername(),
+                "{\"status\":\"completed\",\"revokedSessions\":" + activeTokens.size() + "}"
         );
     }
 

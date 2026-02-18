@@ -6,7 +6,10 @@ import com.optimaxx.management.interfaces.rest.dto.AuthLoginResponse;
 import com.optimaxx.management.interfaces.rest.dto.AuthLogoutRequest;
 import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
 import com.optimaxx.management.interfaces.rest.dto.DeviceSessionResponse;
+import com.optimaxx.management.interfaces.rest.dto.ForgotPasswordRequest;
+import com.optimaxx.management.interfaces.rest.dto.ForgotPasswordResponse;
 import com.optimaxx.management.interfaces.rest.dto.LogoutDeviceRequest;
+import com.optimaxx.management.interfaces.rest.dto.ResetPasswordRequest;
 import com.optimaxx.management.security.AuthService;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
@@ -67,6 +70,17 @@ public class AuthController {
     public ResponseEntity<Void> logoutDevice(@RequestBody LogoutDeviceRequest request,
                                              Authentication authentication) {
         authService.logoutDevice(authentication == null ? null : authentication.getName(), request == null ? null : request.deviceId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/forgot-password")
+    public ForgotPasswordResponse forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        return authService.forgotPassword(request == null ? null : request.email());
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
         return ResponseEntity.noContent().build();
     }
 
