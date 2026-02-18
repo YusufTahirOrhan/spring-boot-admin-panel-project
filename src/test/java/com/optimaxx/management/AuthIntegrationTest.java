@@ -247,6 +247,60 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldListDeviceSessionsForAuthenticatedUser() throws Exception {
+        String ownerToken = jwtTokenService.generateAccessToken("owner", "OWNER");
+
+        User owner = new User();
+        owner.setUsername("owner");
+        owner.setRole(UserRole.OWNER);
+        owner.setStoreId(UUID.randomUUID());
+        owner.setDeleted(false);
+
+        RefreshToken token = new RefreshToken();
+        token.setUser(owner);
+        token.setDeviceId("device-1");
+        token.setExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(owner));
+        when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
+                .thenReturn(java.util.List.of(token));
+
+        mockMvc.perform(get("/api/v1/auth/devices")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .header("X-Device-Id", "device-1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].deviceId").value("device-1"))
+                .andExpect(jsonPath("$[0].current").value(true));
+    }
+
+    @Test
+    void shouldLogoutSpecificDeviceForAuthenticatedUser() throws Exception {
+        String ownerToken = jwtTokenService.generateAccessToken("owner", "OWNER");
+
+        User owner = new User();
+        owner.setUsername("owner");
+        owner.setRole(UserRole.OWNER);
+        owner.setStoreId(UUID.randomUUID());
+        owner.setDeleted(false);
+
+        RefreshToken token = new RefreshToken();
+        token.setUser(owner);
+        token.setDeviceId("device-1");
+        token.setRevoked(false);
+        token.setExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(owner));
+        when(refreshTokenRepository.findByUserAndDeviceIdAndRevokedFalseAndExpiresAtAfter(any(User.class), anyString(), any(Instant.class)))
+                .thenReturn(java.util.List.of(token));
+
+        mockMvc.perform(post("/api/v1/auth/logout-device")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"deviceId\":\"device-1\"}"))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void shouldRejectSelfDeleteForOwner() throws Exception {
         User owner = new User();
         UUID ownerId = UUID.randomUUID();
