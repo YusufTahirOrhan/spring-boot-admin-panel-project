@@ -5,6 +5,8 @@ import com.optimaxx.management.domain.model.UserRole;
 import com.optimaxx.management.domain.repository.UserRepository;
 import com.optimaxx.management.interfaces.rest.dto.AdminCreateUserRequest;
 import com.optimaxx.management.interfaces.rest.dto.UserResponse;
+import com.optimaxx.management.security.audit.AuditEventType;
+import com.optimaxx.management.security.audit.SecurityAuditService;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
 import java.util.UUID;
@@ -23,13 +25,16 @@ public class UserManagementService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final BootstrapOwnerProperties bootstrapOwnerProperties;
+    private final SecurityAuditService securityAuditService;
 
     public UserManagementService(UserRepository userRepository,
                                  PasswordEncoder passwordEncoder,
-                                 BootstrapOwnerProperties bootstrapOwnerProperties) {
+                                 BootstrapOwnerProperties bootstrapOwnerProperties,
+                                 SecurityAuditService securityAuditService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.bootstrapOwnerProperties = bootstrapOwnerProperties;
+        this.securityAuditService = securityAuditService;
     }
 
     @PostConstruct
@@ -55,6 +60,7 @@ public class UserManagementService {
         owner.setStoreId(UUID.randomUUID());
 
         userRepository.save(owner);
+        securityAuditService.log(AuditEventType.USER_CREATED, owner, "USER", owner.getUsername(), "{\"source\":\"bootstrap\"}");
     }
 
     @Transactional
@@ -83,7 +89,9 @@ public class UserManagementService {
         user.setDeleted(false);
         user.setStoreId(UUID.randomUUID());
 
-        return toResponse(userRepository.save(user));
+        User saved = userRepository.save(user);
+        securityAuditService.log(AuditEventType.USER_CREATED, saved, "USER", saved.getUsername(), "{\"source\":\"admin\"}");
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
@@ -102,6 +110,7 @@ public class UserManagementService {
         User user = userRepository.findByIdAndDeletedFalse(userId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "User not found"));
         user.setRole(role);
+        securityAuditService.log(AuditEventType.USER_ROLE_UPDATED, user, "USER", user.getUsername(), "{\"role\":\"" + role.name() + "\"}");
         return toResponse(user);
     }
 
@@ -110,6 +119,7 @@ public class UserManagementService {
         User user = userRepository.findByIdAndDeletedFalse(userId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "User not found"));
         user.setActive(active);
+        securityAuditService.log(AuditEventType.USER_STATUS_UPDATED, user, "USER", user.getUsername(), "{\"active\":" + active + "}");
         return toResponse(user);
     }
 
@@ -139,6 +149,7 @@ public class UserManagementService {
         targetUser.setActive(false);
         targetUser.setDeletedAt(Instant.now());
         targetUser.setDeletedBy(actorUser.getId());
+        securityAuditService.log(AuditEventType.USER_SOFT_DELETED, actorUser, "USER", targetUser.getUsername(), "{\"deleted\":true}");
     }
 
     private UserResponse toResponse(User user) {

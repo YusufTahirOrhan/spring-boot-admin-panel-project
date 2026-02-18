@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.optimaxx.management.domain.model.RefreshToken;
 import com.optimaxx.management.domain.model.User;
 import com.optimaxx.management.domain.model.UserRole;
+import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
 import com.optimaxx.management.security.LoginAttemptService;
@@ -60,6 +61,9 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private PasswordEncoder passwordEncoder;
+
+    @MockitoBean
+    private ActivityLogRepository activityLogRepository;
 
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();
