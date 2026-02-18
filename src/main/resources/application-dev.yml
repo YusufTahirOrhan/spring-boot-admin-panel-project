@@ -2,8 +2,34 @@ spring:
   config:
     activate:
       on-profile: dev
+  datasource:
+    url: jdbc:postgresql://localhost:5432/optimaxx
+    username: optimaxx
+    password: optimaxx
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+
+clickhouse:
+  url: jdbc:clickhouse://localhost:8123/default
+  username: default
+  password: ""
+
+security:
+  jwt:
+    secret-key: dev-change-me-very-long-secret-key
+    access-token-minutes: 60
+    issuer: optimaxx-dev
 
 logging:
   level:
     root: INFO
-    com.yusuf.adminpanel: DEBUG
+    com.optimaxx.management: DEBUG

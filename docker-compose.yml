@@ -1,11 +1,34 @@
 services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: spring-boot-admin-panel-project:local
-    container_name: spring-boot-admin-panel-project
-    ports:
-      - "8080:8080"
+  postgres:
+    image: postgres:17-alpine
+    container_name: optimaxx-postgres
     environment:
-      SPRING_PROFILES_ACTIVE: dev
+      POSTGRES_DB: optimaxx
+      POSTGRES_USER: optimaxx
+      POSTGRES_PASSWORD: optimaxx
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.1
+    container_name: optimaxx-clickhouse
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+
+  redis:
+    image: redis:8-alpine
+    container_name: optimaxx-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  clickhouse_data:
+  redis_data:
