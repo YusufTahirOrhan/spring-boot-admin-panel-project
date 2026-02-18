@@ -206,6 +206,20 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldReturnAuditRetryStatusForOwnerRole() throws Exception {
+        String ownerToken = jwtTokenService.generateAccessToken("owner", "OWNER");
+
+        mockMvc.perform(get("/api/v1/admin/audit/retry-status")
+                        .header("Authorization", "Bearer " + ownerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pendingQueueSize").exists())
+                .andExpect(jsonPath("$.droppedCount").exists())
+                .andExpect(jsonPath("$.publishFailureCount").exists())
+                .andExpect(jsonPath("$.retryAttemptCount").exists())
+                .andExpect(jsonPath("$.publishedSuccessCount").exists());
+    }
+
+    @Test
     void shouldRejectSelfDeleteForOwner() throws Exception {
         User owner = new User();
         UUID ownerId = UUID.randomUUID();
