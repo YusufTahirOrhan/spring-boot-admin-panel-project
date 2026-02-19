@@ -4,6 +4,7 @@ import com.optimaxx.management.domain.model.Customer;
 import com.optimaxx.management.domain.model.RepairOrder;
 import com.optimaxx.management.domain.model.RepairStatus;
 import com.optimaxx.management.domain.model.TransactionType;
+import com.optimaxx.management.domain.model.TransactionTypeCategory;
 import com.optimaxx.management.domain.repository.CustomerRepository;
 import com.optimaxx.management.domain.repository.RepairOrderRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
@@ -54,6 +55,9 @@ public class RepairOrderService {
 
         if (!transactionType.isActive()) {
             throw new ResponseStatusException(BAD_REQUEST, "Transaction type is inactive");
+        }
+        if (transactionType.getCategory() != TransactionTypeCategory.REPAIR) {
+            throw new ResponseStatusException(BAD_REQUEST, "Transaction type category must be REPAIR");
         }
 
         RepairOrder order = new RepairOrder();

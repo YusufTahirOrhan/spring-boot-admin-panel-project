@@ -2,6 +2,7 @@ package com.optimaxx.management.security;
 
 import com.optimaxx.management.domain.model.SaleTransaction;
 import com.optimaxx.management.domain.model.TransactionType;
+import com.optimaxx.management.domain.model.TransactionTypeCategory;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
@@ -47,6 +48,9 @@ public class SalesTransactionService {
 
         if (!transactionType.isActive()) {
             throw new ResponseStatusException(BAD_REQUEST, "Transaction type is inactive");
+        }
+        if (transactionType.getCategory() != TransactionTypeCategory.SALE) {
+            throw new ResponseStatusException(BAD_REQUEST, "Transaction type category must be SALE");
         }
 
         SaleTransaction saleTransaction = new SaleTransaction();

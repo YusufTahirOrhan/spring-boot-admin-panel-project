@@ -35,7 +35,7 @@ class TransactionTypeManagementServiceTest {
 
         TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService);
 
-        var response = service.create(new AdminCreateTransactionTypeRequest("glass_sale", "Glass Sale", true, 1));
+        var response = service.create(new AdminCreateTransactionTypeRequest("glass_sale", "Glass Sale", true, 1, com.optimaxx.management.domain.model.TransactionTypeCategory.SALE, "{\"channel\":\"retail\"}"));
 
         assertThat(response.code()).isEqualTo("GLASS_SALE");
         assertThat(response.name()).isEqualTo("Glass Sale");
@@ -51,7 +51,7 @@ class TransactionTypeManagementServiceTest {
 
         TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService);
 
-        assertThatThrownBy(() -> service.create(new AdminCreateTransactionTypeRequest("glass_sale", "Glass Sale", true, 1)))
+        assertThatThrownBy(() -> service.create(new AdminCreateTransactionTypeRequest("glass_sale", "Glass Sale", true, 1, com.optimaxx.management.domain.model.TransactionTypeCategory.SALE, "{\"channel\":\"retail\"}")))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -89,7 +89,7 @@ class TransactionTypeManagementServiceTest {
 
         TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService);
 
-        var response = service.update(id, new AdminUpdateTransactionTypeRequest("Repair Service", false, 5));
+        var response = service.update(id, new AdminUpdateTransactionTypeRequest("Repair Service", false, 5, com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR, "{\"requiresSerial\":true}"));
 
         assertThat(response.name()).isEqualTo("Repair Service");
         assertThat(response.active()).isFalse();

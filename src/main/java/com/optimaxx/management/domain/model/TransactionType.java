@@ -2,6 +2,8 @@ package com.optimaxx.management.domain.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 
 @Entity
@@ -19,6 +21,13 @@ public class TransactionType extends BaseEntity {
 
     @Column(name = "sort_order", nullable = false)
     private int sortOrder = 0;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "category", nullable = false, length = 32)
+    private TransactionTypeCategory category;
+
+    @Column(name = "metadata_json", length = 4000)
+    private String metadataJson;
 
     public String getCode() {
         return code;
@@ -50,5 +59,21 @@ public class TransactionType extends BaseEntity {
 
     public void setSortOrder(int sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    public TransactionTypeCategory getCategory() {
+        return category;
+    }
+
+    public void setCategory(TransactionTypeCategory category) {
+        this.category = category;
+    }
+
+    public String getMetadataJson() {
+        return metadataJson;
+    }
+
+    public void setMetadataJson(String metadataJson) {
+        this.metadataJson = metadataJson;
     }
 }

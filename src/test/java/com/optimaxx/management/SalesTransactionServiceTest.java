@@ -35,6 +35,8 @@ class SalesTransactionServiceTest {
         type.setCode("GLASS_SALE");
         type.setName("Glass Sale");
         type.setActive(true);
+        type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.SALE);
+        type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.SALE);
 
         when(typeRepository.findByIdAndDeletedFalse(typeId)).thenReturn(Optional.of(type));
         when(saleRepository.save(any(SaleTransaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
