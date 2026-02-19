@@ -1,6 +1,7 @@
 package com.optimaxx.management.security;
 
 import com.optimaxx.management.domain.model.TransactionType;
+import com.optimaxx.management.domain.model.TransactionTypeCategory;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.interfaces.rest.dto.AdminCreateTransactionTypeRequest;
 import com.optimaxx.management.interfaces.rest.dto.AdminUpdateTransactionTypeRequest;
@@ -45,6 +46,8 @@ public class TransactionTypeManagementService {
         transactionType.setName(request.name().trim());
         transactionType.setActive(request.active() == null || request.active());
         transactionType.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
+        transactionType.setCategory(request.category() == null ? TransactionTypeCategory.SALE : request.category());
+        transactionType.setMetadataJson(trimToNull(request.metadataJson()));
         transactionType.setStoreId(UUID.randomUUID());
         transactionType.setDeleted(false);
 
@@ -85,6 +88,12 @@ public class TransactionTypeManagementService {
         if (request.sortOrder() != null) {
             transactionType.setSortOrder(request.sortOrder());
         }
+        if (request.category() != null) {
+            transactionType.setCategory(request.category());
+        }
+        if (request.metadataJson() != null) {
+            transactionType.setMetadataJson(trimToNull(request.metadataJson()));
+        }
 
         securityAuditService.log(AuditEventType.TRANSACTION_TYPE_UPDATED, null, "TRANSACTION_TYPE", transactionType.getCode(), "{\"updated\":true}");
         return toResponse(transactionType);
@@ -109,8 +118,17 @@ public class TransactionTypeManagementService {
                 transactionType.getCode(),
                 transactionType.getName(),
                 transactionType.isActive(),
-                transactionType.getSortOrder()
+                transactionType.getSortOrder(),
+                transactionType.getCategory(),
+                transactionType.getMetadataJson()
         );
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     private boolean isBlank(String value) {

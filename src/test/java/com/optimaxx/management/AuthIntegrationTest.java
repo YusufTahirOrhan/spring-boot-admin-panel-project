@@ -579,6 +579,7 @@ class AuthIntegrationTest {
         transactionType.setCode("GLASS_SALE");
         transactionType.setName("Glass Sale");
         transactionType.setActive(true);
+        transactionType.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.SALE);
 
         when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(transactionType));
         when(saleTransactionRepository.save(any(com.optimaxx.management.domain.model.SaleTransaction.class)))
@@ -617,6 +618,7 @@ class AuthIntegrationTest {
         transactionType.setCode("REPAIR");
         transactionType.setName("Repair");
         transactionType.setActive(false);
+        transactionType.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR);
 
         when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(transactionType));
 
@@ -693,6 +695,7 @@ class AuthIntegrationTest {
         com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
         type.setCode("FRAME_REPAIR");
         type.setActive(true);
+        type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR);
 
         when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
         when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));

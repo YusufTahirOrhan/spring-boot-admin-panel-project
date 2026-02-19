@@ -43,6 +43,7 @@ class RepairOrderServiceTest {
         TransactionType type = new TransactionType();
         type.setCode("FRAME_REPAIR");
         type.setActive(true);
+        type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR);
 
         when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
         when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));
@@ -71,6 +72,7 @@ class RepairOrderServiceTest {
 
         TransactionType type = new TransactionType();
         type.setActive(false);
+        type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR);
         when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));
 
         RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService);
