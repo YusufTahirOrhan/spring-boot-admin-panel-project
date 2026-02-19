@@ -23,11 +23,14 @@ public class TransactionTypeManagementService {
 
     private final TransactionTypeRepository transactionTypeRepository;
     private final SecurityAuditService securityAuditService;
+    private final TransactionTypeMetadataValidator transactionTypeMetadataValidator;
 
     public TransactionTypeManagementService(TransactionTypeRepository transactionTypeRepository,
-                                            SecurityAuditService securityAuditService) {
+                                            SecurityAuditService securityAuditService,
+                                            TransactionTypeMetadataValidator transactionTypeMetadataValidator) {
         this.transactionTypeRepository = transactionTypeRepository;
         this.securityAuditService = securityAuditService;
+        this.transactionTypeMetadataValidator = transactionTypeMetadataValidator;
     }
 
     @Transactional
@@ -41,13 +44,17 @@ public class TransactionTypeManagementService {
             throw new ResponseStatusException(BAD_REQUEST, "Transaction type code already exists");
         }
 
+        TransactionTypeCategory category = request.category() == null ? TransactionTypeCategory.SALE : request.category();
+        String metadataJson = trimToNull(request.metadataJson());
+        transactionTypeMetadataValidator.validate(category, metadataJson);
+
         TransactionType transactionType = new TransactionType();
         transactionType.setCode(normalizedCode);
         transactionType.setName(request.name().trim());
         transactionType.setActive(request.active() == null || request.active());
         transactionType.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
-        transactionType.setCategory(request.category() == null ? TransactionTypeCategory.SALE : request.category());
-        transactionType.setMetadataJson(trimToNull(request.metadataJson()));
+        transactionType.setCategory(category);
+        transactionType.setMetadataJson(metadataJson);
         transactionType.setStoreId(UUID.randomUUID());
         transactionType.setDeleted(false);
 
@@ -88,12 +95,17 @@ public class TransactionTypeManagementService {
         if (request.sortOrder() != null) {
             transactionType.setSortOrder(request.sortOrder());
         }
-        if (request.category() != null) {
-            transactionType.setCategory(request.category());
-        }
-        if (request.metadataJson() != null) {
-            transactionType.setMetadataJson(trimToNull(request.metadataJson()));
-        }
+
+        TransactionTypeCategory nextCategory = request.category() == null
+                ? transactionType.getCategory()
+                : request.category();
+        String nextMetadata = request.metadataJson() == null
+                ? transactionType.getMetadataJson()
+                : trimToNull(request.metadataJson());
+
+        transactionTypeMetadataValidator.validate(nextCategory, nextMetadata);
+        transactionType.setCategory(nextCategory);
+        transactionType.setMetadataJson(nextMetadata);
 
         securityAuditService.log(AuditEventType.TRANSACTION_TYPE_UPDATED, null, "TRANSACTION_TYPE", transactionType.getCode(), "{\"updated\":true}");
         return toResponse(transactionType);
