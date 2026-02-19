@@ -6,5 +6,7 @@ import java.util.UUID;
 public record CreateSaleTransactionRequest(UUID transactionTypeId,
                                            String customerName,
                                            BigDecimal amount,
-                                           String notes) {
+                                           String notes,
+                                           UUID inventoryItemId,
+                                           Integer inventoryQuantity) {
 }
