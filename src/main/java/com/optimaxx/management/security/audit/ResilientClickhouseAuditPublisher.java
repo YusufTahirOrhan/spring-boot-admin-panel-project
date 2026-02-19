@@ -21,9 +21,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
-public class NoopClickhouseAuditPublisher implements ClickhouseAuditPublisher {
+public class ResilientClickhouseAuditPublisher implements ClickhouseAuditPublisher {
 
-    private static final Logger log = LoggerFactory.getLogger(NoopClickhouseAuditPublisher.class);
+    private static final Logger log = LoggerFactory.getLogger(ResilientClickhouseAuditPublisher.class);
     private static final String INSERT_QUERY = "INSERT INTO audit_events FORMAT JSONEachRow";
 
     private final ClickhouseProperties clickhouseProperties;
@@ -35,7 +35,7 @@ public class NoopClickhouseAuditPublisher implements ClickhouseAuditPublisher {
     private final AtomicLong retryAttemptCount = new AtomicLong(0);
     private final AtomicLong publishedSuccessCount = new AtomicLong(0);
 
-    public NoopClickhouseAuditPublisher(ClickhouseProperties clickhouseProperties,
+    public ResilientClickhouseAuditPublisher(ClickhouseProperties clickhouseProperties,
                                         ClickhouseAuditRetryProperties retryProperties,
                                         MeterRegistry meterRegistry) {
         this.clickhouseProperties = clickhouseProperties;
@@ -44,7 +44,7 @@ public class NoopClickhouseAuditPublisher implements ClickhouseAuditPublisher {
                 .connectTimeout(Duration.ofSeconds(2))
                 .build();
 
-        Gauge.builder("optimaxx.audit.retry.queue.size", this, NoopClickhouseAuditPublisher::getPendingQueueSize)
+        Gauge.builder("optimaxx.audit.retry.queue.size", this, ResilientClickhouseAuditPublisher::getPendingQueueSize)
                 .description("Pending audit events waiting for ClickHouse retry")
                 .register(meterRegistry);
         Gauge.builder("optimaxx.audit.retry.dropped.count", this, p -> p.getDroppedCount())
