@@ -45,6 +45,7 @@ public class AuthService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final LoginAttemptService loginAttemptService;
+    private final ForgotPasswordAttemptService forgotPasswordAttemptService;
     private final JwtTokenService jwtTokenService;
     private final JwtProperties jwtProperties;
     private final SecurityAuditService securityAuditService;
@@ -55,6 +56,7 @@ public class AuthService {
                        PasswordResetTokenRepository passwordResetTokenRepository,
                        PasswordEncoder passwordEncoder,
                        LoginAttemptService loginAttemptService,
+                       ForgotPasswordAttemptService forgotPasswordAttemptService,
                        JwtTokenService jwtTokenService,
                        JwtProperties jwtProperties,
                        SecurityAuditService securityAuditService) {
@@ -63,6 +65,7 @@ public class AuthService {
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.loginAttemptService = loginAttemptService;
+        this.forgotPasswordAttemptService = forgotPasswordAttemptService;
         this.jwtTokenService = jwtTokenService;
         this.jwtProperties = jwtProperties;
         this.securityAuditService = securityAuditService;
@@ -233,9 +236,11 @@ public class AuthService {
         }
 
         String normalizedEmail = email.trim().toLowerCase();
+        forgotPasswordAttemptService.checkAllowed(normalizedEmail);
+
         User user = userRepository.findByEmailAndDeletedFalse(normalizedEmail).orElse(null);
         if (user == null) {
-            return new ForgotPasswordResponse(null, PASSWORD_RESET_EXPIRES_MINUTES);
+            return new ForgotPasswordResponse("If the account exists, reset instructions have been prepared.", PASSWORD_RESET_EXPIRES_MINUTES);
         }
 
         List<PasswordResetToken> activeTokens = passwordResetTokenRepository
@@ -254,7 +259,7 @@ public class AuthService {
         passwordResetTokenRepository.save(resetToken);
 
         securityAuditService.log(AuditEventType.PASSWORD_RESET_REQUESTED, user, "AUTH", user.getUsername(), "{\"status\":\"requested\"}");
-        return new ForgotPasswordResponse(rawToken, PASSWORD_RESET_EXPIRES_MINUTES);
+        return new ForgotPasswordResponse("If the account exists, reset instructions have been prepared.", PASSWORD_RESET_EXPIRES_MINUTES);
     }
 
     @Transactional

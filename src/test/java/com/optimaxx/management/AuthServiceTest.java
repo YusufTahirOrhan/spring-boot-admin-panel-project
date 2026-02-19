@@ -22,6 +22,8 @@ import com.optimaxx.management.interfaces.rest.dto.AuthRefreshRequest;
 import com.optimaxx.management.interfaces.rest.dto.ForgotPasswordResponse;
 import com.optimaxx.management.interfaces.rest.dto.ResetPasswordRequest;
 import com.optimaxx.management.security.AuthService;
+import com.optimaxx.management.security.ForgotPasswordAttemptService;
+import com.optimaxx.management.security.ForgotPasswordProtectionProperties;
 import com.optimaxx.management.security.LoginAttemptService;
 import com.optimaxx.management.security.LoginProtectionProperties;
 import com.optimaxx.management.security.audit.SecurityAuditService;
@@ -59,6 +61,7 @@ class AuthServiceTest {
                 passwordResetTokenRepository,
                 passwordEncoder,
                 createLoginAttemptService(),
+                createForgotPasswordAttemptService(),
                 jwtTokenService,
                 jwtProperties,
                 Mockito.mock(SecurityAuditService.class)
@@ -119,6 +122,7 @@ class AuthServiceTest {
                 passwordResetTokenRepository,
                 passwordEncoder,
                 createLoginAttemptService(),
+                createForgotPasswordAttemptService(),
                 jwtTokenService,
                 jwtProperties,
                 Mockito.mock(SecurityAuditService.class)
@@ -156,6 +160,7 @@ class AuthServiceTest {
                 passwordResetTokenRepository,
                 passwordEncoder,
                 createLoginAttemptService(),
+                createForgotPasswordAttemptService(),
                 jwtTokenService,
                 jwtProperties,
                 Mockito.mock(SecurityAuditService.class)
@@ -184,7 +189,7 @@ class AuthServiceTest {
         when(passwordEncoder.matches("owner123", "hashed")).thenReturn(true);
         when(passwordEncoder.encode("newPassword123")).thenReturn("new-hash");
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), createForgotPasswordAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         authService.changePassword("owner", new AuthChangePasswordRequest("owner123", "newPassword123"));
 
@@ -212,7 +217,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
                 .thenReturn(java.util.List.of(token));
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), createForgotPasswordAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         assertThat(authService.listDeviceSessions("owner", "device-1")).hasSize(1);
     }
@@ -239,7 +244,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByUserAndDeviceIdAndRevokedFalseAndExpiresAtAfter(any(User.class), anyString(), any(Instant.class)))
                 .thenReturn(java.util.List.of(token));
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), createForgotPasswordAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         authService.logoutDevice("owner", "device-1");
 
@@ -262,11 +267,12 @@ class AuthServiceTest {
         when(passwordResetTokenRepository.findByUserAndUsedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
                 .thenReturn(java.util.List.of());
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), createForgotPasswordAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         ForgotPasswordResponse response = authService.forgotPassword("owner@optimaxx.local");
 
-        assertThat(response.resetToken()).isNotBlank();
+        assertThat(response.message()).isNotBlank();
+        assertThat(response.expiresInMinutes()).isEqualTo(15);
         verify(passwordResetTokenRepository).save(any());
     }
 
@@ -297,7 +303,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
                 .thenReturn(java.util.List.of(refreshToken));
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), createForgotPasswordAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         authService.resetPassword(new ResetPasswordRequest("raw-token", "newPassword123"));
 
@@ -320,7 +326,7 @@ class AuthServiceTest {
         when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
 
-        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
+        AuthService authService = new AuthService(userRepository, refreshTokenRepository, passwordResetTokenRepository, passwordEncoder, createLoginAttemptService(), createForgotPasswordAttemptService(), jwtTokenService, jwtProperties, Mockito.mock(SecurityAuditService.class));
 
         assertThatThrownBy(() -> authService.changePassword("owner", new AuthChangePasswordRequest("wrong", "newPassword123")))
                 .isInstanceOf(BadCredentialsException.class);
@@ -347,6 +353,7 @@ class AuthServiceTest {
                 passwordResetTokenRepository,
                 passwordEncoder,
                 loginAttemptService,
+                createForgotPasswordAttemptService(),
                 jwtTokenService,
                 jwtProperties,
                 Mockito.mock(SecurityAuditService.class)
@@ -362,6 +369,13 @@ class AuthServiceTest {
         ObjectProvider<org.springframework.data.redis.core.StringRedisTemplate> redisProvider = Mockito.mock(ObjectProvider.class);
         when(redisProvider.getIfAvailable()).thenReturn(null);
         return new LoginAttemptService(new LoginProtectionProperties(maxFailures, lockMinutes), redisProvider);
+    }
+
+    private ForgotPasswordAttemptService createForgotPasswordAttemptService() {
+        @SuppressWarnings("unchecked")
+        ObjectProvider<org.springframework.data.redis.core.StringRedisTemplate> redisProvider = Mockito.mock(ObjectProvider.class);
+        when(redisProvider.getIfAvailable()).thenReturn(null);
+        return new ForgotPasswordAttemptService(new ForgotPasswordProtectionProperties(2, 5), redisProvider);
     }
 
     private User createActiveUser() {

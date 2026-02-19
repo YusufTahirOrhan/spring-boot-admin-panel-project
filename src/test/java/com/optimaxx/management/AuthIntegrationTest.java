@@ -16,6 +16,7 @@ import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
+import com.optimaxx.management.security.ForgotPasswordAttemptService;
 import com.optimaxx.management.security.LoginAttemptService;
 import com.optimaxx.management.security.jwt.JwtTokenService;
 import java.time.Instant;
@@ -41,7 +42,9 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
                 "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration," +
                 "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration," +
                 "org.springframework.boot.data.redis.autoconfigure.DataRedisAutoConfiguration," +
-                "org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration"
+                "org.springframework.boot.data.redis.autoconfigure.DataRedisRepositoriesAutoConfiguration",
+        "security.forgot-password-protection.max-requests=2",
+        "security.forgot-password-protection.window-minutes=5"
 })
 class AuthIntegrationTest {
 
@@ -53,6 +56,9 @@ class AuthIntegrationTest {
 
     @Autowired
     private LoginAttemptService loginAttemptService;
+
+    @Autowired
+    private ForgotPasswordAttemptService forgotPasswordAttemptService;
 
     @MockitoBean
     private UserRepository userRepository;
@@ -80,6 +86,7 @@ class AuthIntegrationTest {
 
         refreshTokenStore.clear();
         loginAttemptService.clearAll();
+        forgotPasswordAttemptService.clearAll();
 
         when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(invocation -> {
             RefreshToken token = invocation.getArgument(0);
@@ -338,7 +345,7 @@ class AuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(forgotBody))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.resetToken").isNotEmpty());
+                .andExpect(jsonPath("$.message").isNotEmpty());
 
         String resetBody = """
                 {"resetToken":"any-token","newPassword":"newPassword123"}
@@ -348,6 +355,30 @@ class AuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(resetBody))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldRateLimitForgotPasswordRequests() throws Exception {
+        String forgotBody = """
+                {"email":"owner@optimaxx.local"}
+                """;
+
+        when(userRepository.findByEmailAndDeletedFalse("owner@optimaxx.local")).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(forgotBody))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(forgotBody))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(forgotBody))
+                .andExpect(status().isTooManyRequests());
     }
 
     @Test

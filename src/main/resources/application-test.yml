@@ -29,6 +29,9 @@ security:
   login-protection:
     max-failures: 3
     lock-minutes: 1
+  forgot-password-protection:
+    max-requests: 2
+    window-minutes: 5
 
 logging:
   level:
