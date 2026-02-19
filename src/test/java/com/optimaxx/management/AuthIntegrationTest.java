@@ -15,6 +15,7 @@ import com.optimaxx.management.domain.model.UserRole;
 import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
+import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
 import com.optimaxx.management.security.ForgotPasswordAttemptService;
@@ -78,6 +79,9 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private TransactionTypeRepository transactionTypeRepository;
+
+    @MockitoBean
+    private SaleTransactionRepository saleTransactionRepository;
 
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();
@@ -555,6 +559,67 @@ class AuthIntegrationTest {
         mockMvc.perform(delete("/api/v1/admin/users/" + ownerId)
                         .header("Authorization", "Bearer " + ownerToken))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldCreateAndListSalesTransactionsForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        UUID transactionTypeId = UUID.randomUUID();
+        com.optimaxx.management.domain.model.TransactionType transactionType = new com.optimaxx.management.domain.model.TransactionType();
+        transactionType.setCode("GLASS_SALE");
+        transactionType.setName("Glass Sale");
+        transactionType.setActive(true);
+
+        when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(transactionType));
+        when(saleTransactionRepository.save(any(com.optimaxx.management.domain.model.SaleTransaction.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        String createBody = """
+                {"transactionTypeId":"%s","customerName":"Yusuf","amount":1200.50,"notes":"frame + lens"}
+                """.formatted(transactionTypeId);
+
+        mockMvc.perform(post("/api/v1/sales/transactions")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactionTypeCode").value("GLASS_SALE"));
+
+        com.optimaxx.management.domain.model.SaleTransaction listed = new com.optimaxx.management.domain.model.SaleTransaction();
+        listed.setTransactionType(transactionType);
+        listed.setCustomerName("Yusuf");
+        listed.setAmount(new java.math.BigDecimal("1200.50"));
+        listed.setOccurredAt(Instant.now());
+        when(saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()).thenReturn(java.util.List.of(listed));
+
+        mockMvc.perform(get("/api/v1/sales/transactions")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].customerName").value("Yusuf"));
+    }
+
+    @Test
+    void shouldRejectSalesTransactionForInactiveType() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        UUID transactionTypeId = UUID.randomUUID();
+        com.optimaxx.management.domain.model.TransactionType transactionType = new com.optimaxx.management.domain.model.TransactionType();
+        transactionType.setCode("REPAIR");
+        transactionType.setName("Repair");
+        transactionType.setActive(false);
+
+        when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(transactionType));
+
+        String createBody = """
+                {"transactionTypeId":"%s","customerName":"Yusuf","amount":1200.50}
+                """.formatted(transactionTypeId);
+
+        mockMvc.perform(post("/api/v1/sales/transactions")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isBadRequest());
     }
 
     private String extractRefreshToken(String json) {
