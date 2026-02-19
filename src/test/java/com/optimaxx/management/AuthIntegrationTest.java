@@ -104,6 +104,17 @@ class AuthIntegrationTest {
                     }
                     return Optional.of(token);
                 });
+
+        when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
+                .thenAnswer(invocation -> {
+                    User user = invocation.getArgument(0);
+                    Instant now = invocation.getArgument(1);
+                    return refreshTokenStore.values().stream()
+                            .filter(token -> token.getUser() == user)
+                            .filter(token -> !token.isRevoked())
+                            .filter(token -> token.getExpiresAt() != null && token.getExpiresAt().isAfter(now))
+                            .toList();
+                });
     }
 
     @Test
@@ -379,6 +390,136 @@ class AuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(forgotBody))
                 .andExpect(status().isTooManyRequests());
+    }
+
+    @Test
+    void shouldRejectExpiredPasswordResetToken() throws Exception {
+        com.optimaxx.management.domain.model.PasswordResetToken expiredToken = new com.optimaxx.management.domain.model.PasswordResetToken();
+        expiredToken.setUsed(false);
+        expiredToken.setExpiresAt(Instant.now().minusSeconds(60));
+
+        when(passwordResetTokenRepository.findByTokenHashAndUsedFalseAndExpiresAtAfter(anyString(), any(Instant.class)))
+                .thenReturn(Optional.empty());
+
+        String resetBody = """
+                {"resetToken":"expired-token","newPassword":"newPassword123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resetBody))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRejectReusedPasswordResetToken() throws Exception {
+        User owner = new User();
+        owner.setUsername("owner");
+        owner.setEmail("owner@optimaxx.local");
+        owner.setRole(UserRole.OWNER);
+        owner.setActive(true);
+        owner.setDeleted(false);
+        owner.setStoreId(UUID.randomUUID());
+
+        com.optimaxx.management.domain.model.PasswordResetToken resetToken = new com.optimaxx.management.domain.model.PasswordResetToken();
+        resetToken.setUser(owner);
+        resetToken.setUsed(false);
+        resetToken.setExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(passwordResetTokenRepository.findByTokenHashAndUsedFalseAndExpiresAtAfter(anyString(), any(Instant.class)))
+                .thenReturn(Optional.of(resetToken), Optional.empty());
+        when(passwordEncoder.encode("newPassword123")).thenReturn("new-hash");
+        when(refreshTokenRepository.findByUserAndRevokedFalseAndExpiresAtAfter(any(User.class), any(Instant.class)))
+                .thenReturn(java.util.List.of());
+
+        String resetBody = """
+                {"resetToken":"single-use-token","newPassword":"newPassword123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resetBody))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resetBody))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void shouldRevokeAllDeviceRefreshTokensAfterPasswordReset() throws Exception {
+        User owner = new User();
+        owner.setUsername("owner");
+        owner.setEmail("owner@optimaxx.local");
+        owner.setPasswordHash("hashed-pass");
+        owner.setRole(UserRole.OWNER);
+        owner.setActive(true);
+        owner.setDeleted(false);
+        owner.setStoreId(UUID.randomUUID());
+
+        when(userRepository.findByUsernameAndDeletedFalse("owner")).thenReturn(Optional.of(owner));
+        when(passwordEncoder.matches("owner12345", "hashed-pass")).thenReturn(true);
+
+        String loginBody = """
+                {"username":"owner","password":"owner12345"}
+                """;
+
+        String device1Login = mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Device-Id", "device-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        String device2Login = mockMvc.perform(post("/api/v1/auth/login")
+                        .header("X-Device-Id", "device-2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginBody))
+                .andExpect(status().isOk())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        com.optimaxx.management.domain.model.PasswordResetToken resetToken = new com.optimaxx.management.domain.model.PasswordResetToken();
+        resetToken.setUser(owner);
+        resetToken.setUsed(false);
+        resetToken.setExpiresAt(Instant.now().plusSeconds(3600));
+
+        when(passwordResetTokenRepository.findByTokenHashAndUsedFalseAndExpiresAtAfter(anyString(), any(Instant.class)))
+                .thenReturn(Optional.of(resetToken));
+        when(passwordEncoder.encode("newPassword123")).thenReturn("new-hash");
+
+        String resetBody = """
+                {"resetToken":"valid-token","newPassword":"newPassword123"}
+                """;
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resetBody))
+                .andExpect(status().isNoContent());
+
+        String refreshBodyDevice1 = """
+                {"refreshToken":"%s"}
+                """.formatted(extractRefreshToken(device1Login));
+
+        String refreshBodyDevice2 = """
+                {"refreshToken":"%s"}
+                """.formatted(extractRefreshToken(device2Login));
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header("X-Device-Id", "device-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshBodyDevice1))
+                .andExpect(status().isUnauthorized());
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .header("X-Device-Id", "device-2")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(refreshBodyDevice2))
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
