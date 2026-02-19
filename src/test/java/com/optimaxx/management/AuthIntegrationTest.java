@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -16,6 +17,7 @@ import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.CustomerRepository;
+import com.optimaxx.management.domain.repository.RepairOrderRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
@@ -86,6 +88,9 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private CustomerRepository customerRepository;
+
+    @MockitoBean
+    private RepairOrderRepository repairOrderRepository;
 
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();
@@ -671,6 +676,62 @@ class AuthIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldCreateListAndUpdateRepairOrdersForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        UUID customerId = UUID.randomUUID();
+        UUID transactionTypeId = UUID.randomUUID();
+        UUID repairOrderId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.Customer customer = new com.optimaxx.management.domain.model.Customer();
+        customer.setFirstName("Yusuf");
+        customer.setLastName("Orhan");
+
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        type.setCode("FRAME_REPAIR");
+        type.setActive(true);
+
+        when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
+        when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));
+
+        com.optimaxx.management.domain.model.RepairOrder saved = new com.optimaxx.management.domain.model.RepairOrder();
+        saved.setCustomer(customer);
+        saved.setTransactionType(type);
+        saved.setTitle("Temple Fix");
+        saved.setStatus(com.optimaxx.management.domain.model.RepairStatus.RECEIVED);
+        saved.setReceivedAt(Instant.now());
+
+        when(repairOrderRepository.save(any(com.optimaxx.management.domain.model.RepairOrder.class))).thenReturn(saved);
+
+        String createBody = """
+                {"customerId":"%s","transactionTypeId":"%s","title":"Temple Fix","description":"left side loose"}
+                """.formatted(customerId, transactionTypeId);
+
+        mockMvc.perform(post("/api/v1/sales/repairs")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("Temple Fix"));
+
+        when(repairOrderRepository.findByDeletedFalseOrderByReceivedAtDesc()).thenReturn(java.util.List.of(saved));
+
+        mockMvc.perform(get("/api/v1/sales/repairs")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].status").value("RECEIVED"));
+
+        when(repairOrderRepository.findByIdAndDeletedFalse(any(java.util.UUID.class))).thenReturn(Optional.of(saved));
+
+        mockMvc.perform(patch("/api/v1/sales/repairs/{id}/status", repairOrderId)
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"IN_PROGRESS\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
     }
 
     private String extractRefreshToken(String json) {
