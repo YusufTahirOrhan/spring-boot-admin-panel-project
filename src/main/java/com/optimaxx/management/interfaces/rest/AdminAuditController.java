@@ -1,7 +1,7 @@
 package com.optimaxx.management.interfaces.rest;
 
 import com.optimaxx.management.interfaces.rest.dto.AuditRetryStatusResponse;
-import com.optimaxx.management.security.audit.NoopClickhouseAuditPublisher;
+import com.optimaxx.management.security.audit.ResilientClickhouseAuditPublisher;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -10,9 +10,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/admin/audit")
 public class AdminAuditController {
 
-    private final NoopClickhouseAuditPublisher auditPublisher;
+    private final ResilientClickhouseAuditPublisher auditPublisher;
 
-    public AdminAuditController(NoopClickhouseAuditPublisher auditPublisher) {
+    public AdminAuditController(ResilientClickhouseAuditPublisher auditPublisher) {
         this.auditPublisher = auditPublisher;
     }
 

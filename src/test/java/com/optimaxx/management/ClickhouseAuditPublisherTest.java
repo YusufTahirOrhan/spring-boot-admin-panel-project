@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import com.optimaxx.management.domain.model.ActivityLog;
 import com.optimaxx.management.security.audit.ClickhouseAuditRetryProperties;
 import com.optimaxx.management.security.audit.ClickhouseProperties;
-import com.optimaxx.management.security.audit.NoopClickhouseAuditPublisher;
+import com.optimaxx.management.security.audit.ResilientClickhouseAuditPublisher;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.time.Instant;
 import java.util.UUID;
@@ -18,7 +18,7 @@ class ClickhouseAuditPublisherTest {
     void shouldNotThrowWhenClickhouseEndpointIsUnavailable() {
         ClickhouseProperties properties = new ClickhouseProperties("http://localhost:65534/default", "default", "");
         ClickhouseAuditRetryProperties retryProperties = new ClickhouseAuditRetryProperties();
-        NoopClickhouseAuditPublisher publisher = new NoopClickhouseAuditPublisher(properties, retryProperties, new SimpleMeterRegistry());
+        ResilientClickhouseAuditPublisher publisher = new ResilientClickhouseAuditPublisher(properties, retryProperties, new SimpleMeterRegistry());
 
         ActivityLog activityLog = createActivityLog();
 
@@ -33,7 +33,7 @@ class ClickhouseAuditPublisherTest {
         retryProperties.setMaxAttempts(2);
         retryProperties.setFlushBatchSize(5);
 
-        NoopClickhouseAuditPublisher publisher = new NoopClickhouseAuditPublisher(properties, retryProperties, new SimpleMeterRegistry());
+        ResilientClickhouseAuditPublisher publisher = new ResilientClickhouseAuditPublisher(properties, retryProperties, new SimpleMeterRegistry());
 
         publisher.publish(createActivityLog());
 
