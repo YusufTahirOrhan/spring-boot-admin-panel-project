@@ -3,6 +3,7 @@ package com.optimaxx.management;
 import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
+import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +33,9 @@ class OptiMaxxManagementApplicationTests {
 
     @MockitoBean
     private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @MockitoBean
+    private TransactionTypeRepository transactionTypeRepository;
 
     @Test
     void contextLoads() {
