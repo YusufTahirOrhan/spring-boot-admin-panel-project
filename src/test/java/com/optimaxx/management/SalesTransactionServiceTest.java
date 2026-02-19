@@ -91,7 +91,7 @@ class SalesTransactionServiceTest {
         when(saleRepository.save(any(SaleTransaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
         InventoryItem item = new InventoryItem();
         item.setSku("SKU-1");
-        when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), any(String.class))).thenReturn(item);
+        when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), any(String.class), any(String.class), org.mockito.ArgumentMatchers.nullable(UUID.class), any(String.class))).thenReturn(item);
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, auditService, inventoryStockCoordinator);
         service.create(new CreateSaleTransactionRequest(typeId, "Yusuf", new BigDecimal("1500.00"), "progressive lens", itemId, 2));
@@ -99,7 +99,10 @@ class SalesTransactionServiceTest {
         verify(inventoryStockCoordinator).consume(
                 org.mockito.ArgumentMatchers.eq(itemId),
                 org.mockito.ArgumentMatchers.eq(2),
-                org.mockito.ArgumentMatchers.contains("SALE transaction")
+                org.mockito.ArgumentMatchers.contains("SALE transaction"),
+                org.mockito.ArgumentMatchers.eq("SALE_TRANSACTION"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.contains("null:consume")
         );
     }
 

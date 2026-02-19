@@ -109,7 +109,7 @@ class RepairOrderServiceTest {
         when(repairOrderRepository.save(any(RepairOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
         InventoryItem item = new InventoryItem();
         item.setSku("SKU-1");
-        when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), any(String.class))).thenReturn(item);
+        when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), any(String.class), any(String.class), org.mockito.ArgumentMatchers.nullable(UUID.class), any(String.class))).thenReturn(item);
 
         RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService, inventoryStockCoordinator);
         service.create(new CreateRepairOrderRequest(customerId, transactionTypeId, "Temple Fix", "left side loose", itemId, 1));
@@ -117,7 +117,10 @@ class RepairOrderServiceTest {
         verify(inventoryStockCoordinator).consume(
                 org.mockito.ArgumentMatchers.eq(itemId),
                 org.mockito.ArgumentMatchers.eq(1),
-                org.mockito.ArgumentMatchers.contains("REPAIR order")
+                org.mockito.ArgumentMatchers.contains("REPAIR reservation"),
+                org.mockito.ArgumentMatchers.eq("REPAIR_ORDER_RESERVATION"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.contains("null:reserve")
         );
     }
 
@@ -144,6 +147,50 @@ class RepairOrderServiceTest {
         assertThatThrownBy(() -> service.create(new CreateRepairOrderRequest(customerId, transactionTypeId, "Fix", null, UUID.randomUUID(), null)))
                 .isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(inventoryStockCoordinator);
+    }
+
+    @Test
+    void shouldReleaseReservedStockWhenCanceled() {
+        RepairOrderRepository repairOrderRepository = Mockito.mock(RepairOrderRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        TransactionTypeRepository transactionTypeRepository = Mockito.mock(TransactionTypeRepository.class);
+        SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        UUID orderId = UUID.randomUUID();
+        UUID inventoryItemId = UUID.randomUUID();
+        RepairOrder order = new RepairOrder();
+        Customer customer = new Customer();
+        TransactionType type = new TransactionType();
+        order.setCustomer(customer);
+        order.setTransactionType(type);
+        order.setStatus(RepairStatus.IN_PROGRESS);
+        order.setTitle("Repair");
+        order.setReservedInventoryItemId(inventoryItemId);
+        order.setReservedInventoryQuantity(2);
+        order.setInventoryReleased(false);
+
+        InventoryItem item = new InventoryItem();
+        item.setSku("SKU-1");
+
+        when(repairOrderRepository.findByIdAndDeletedFalse(orderId)).thenReturn(Optional.of(order));
+        when(inventoryStockCoordinator.release(any(UUID.class), any(Integer.class), any(String.class), any(String.class), org.mockito.ArgumentMatchers.nullable(UUID.class), any(String.class)))
+                .thenReturn(item);
+
+        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService, inventoryStockCoordinator);
+
+        var response = service.updateStatus(orderId, new UpdateRepairStatusRequest(RepairStatus.CANCELED));
+
+        assertThat(response.status()).isEqualTo(RepairStatus.CANCELED);
+        assertThat(order.isInventoryReleased()).isTrue();
+        verify(inventoryStockCoordinator).release(
+                org.mockito.ArgumentMatchers.eq(inventoryItemId),
+                org.mockito.ArgumentMatchers.eq(2),
+                org.mockito.ArgumentMatchers.contains("release"),
+                org.mockito.ArgumentMatchers.eq("REPAIR_ORDER_RELEASE"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.contains(":release")
+        );
     }
 
     @Test

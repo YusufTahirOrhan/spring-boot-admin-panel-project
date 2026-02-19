@@ -75,7 +75,10 @@ public class SalesTransactionService {
             var item = inventoryStockCoordinator.consume(
                     request.inventoryItemId(),
                     request.inventoryQuantity(),
-                    "SALE transaction " + saved.getId()
+                    "SALE transaction " + saved.getId(),
+                    "SALE_TRANSACTION",
+                    saved.getId(),
+                    "sale:" + saved.getId() + ":consume"
             );
             securityAuditService.log(
                     AuditEventType.SALE_STOCK_DEDUCTED,

@@ -31,6 +31,15 @@ public class InventoryMovement extends BaseEntity {
     @Column(name = "moved_at", nullable = false)
     private Instant movedAt;
 
+    @Column(name = "source_type", length = 40)
+    private String sourceType;
+
+    @Column(name = "source_id")
+    private java.util.UUID sourceId;
+
+    @Column(name = "idempotency_key", unique = true, length = 120)
+    private String idempotencyKey;
+
     public InventoryItem getInventoryItem() {
         return inventoryItem;
     }
@@ -69,5 +78,29 @@ public class InventoryMovement extends BaseEntity {
 
     public void setMovedAt(Instant movedAt) {
         this.movedAt = movedAt;
+    }
+
+    public String getSourceType() {
+        return sourceType;
+    }
+
+    public void setSourceType(String sourceType) {
+        this.sourceType = sourceType;
+    }
+
+    public java.util.UUID getSourceId() {
+        return sourceId;
+    }
+
+    public void setSourceId(java.util.UUID sourceId) {
+        this.sourceId = sourceId;
+    }
+
+    public String getIdempotencyKey() {
+        return idempotencyKey;
+    }
+
+    public void setIdempotencyKey(String idempotencyKey) {
+        this.idempotencyKey = idempotencyKey;
     }
 }
