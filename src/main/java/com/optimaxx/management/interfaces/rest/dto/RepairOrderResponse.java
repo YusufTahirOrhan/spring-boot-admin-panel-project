@@ -10,5 +10,8 @@ public record RepairOrderResponse(UUID id,
                                   String title,
                                   String description,
                                   RepairStatus status,
-                                  Instant receivedAt) {
+                                  Instant receivedAt,
+                                  UUID reservedInventoryItemId,
+                                  Integer reservedInventoryQuantity,
+                                  boolean inventoryReleased) {
 }

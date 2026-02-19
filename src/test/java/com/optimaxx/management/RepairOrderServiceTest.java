@@ -59,6 +59,9 @@ class RepairOrderServiceTest {
 
         assertThat(response.title()).isEqualTo("Temple Fix");
         assertThat(response.status()).isEqualTo(RepairStatus.RECEIVED);
+        assertThat(response.reservedInventoryItemId()).isNull();
+        assertThat(response.reservedInventoryQuantity()).isNull();
+        assertThat(response.inventoryReleased()).isFalse();
         verify(repairOrderRepository).save(any(RepairOrder.class));
     }
 
@@ -191,6 +194,56 @@ class RepairOrderServiceTest {
                 org.mockito.ArgumentMatchers.isNull(),
                 org.mockito.ArgumentMatchers.contains(":release")
         );
+    }
+
+    @Test
+    void shouldRejectInvalidStatusTransition() {
+        RepairOrderRepository repairOrderRepository = Mockito.mock(RepairOrderRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        TransactionTypeRepository transactionTypeRepository = Mockito.mock(TransactionTypeRepository.class);
+        SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        UUID orderId = UUID.randomUUID();
+        RepairOrder order = new RepairOrder();
+        order.setStatus(RepairStatus.RECEIVED);
+        order.setCustomer(new Customer());
+        order.setTransactionType(new TransactionType());
+        order.setTitle("Repair");
+
+        when(repairOrderRepository.findByIdAndDeletedFalse(orderId)).thenReturn(Optional.of(order));
+
+        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService, inventoryStockCoordinator);
+
+        assertThatThrownBy(() -> service.updateStatus(orderId, new UpdateRepairStatusRequest(RepairStatus.DELIVERED)))
+                .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void shouldNotReleaseStockWhenDelivered() {
+        RepairOrderRepository repairOrderRepository = Mockito.mock(RepairOrderRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        TransactionTypeRepository transactionTypeRepository = Mockito.mock(TransactionTypeRepository.class);
+        SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        UUID orderId = UUID.randomUUID();
+        RepairOrder order = new RepairOrder();
+        order.setCustomer(new Customer());
+        order.setTransactionType(new TransactionType());
+        order.setTitle("Repair");
+        order.setStatus(RepairStatus.READY_FOR_PICKUP);
+        order.setReservedInventoryItemId(UUID.randomUUID());
+        order.setReservedInventoryQuantity(1);
+        order.setInventoryReleased(false);
+
+        when(repairOrderRepository.findByIdAndDeletedFalse(orderId)).thenReturn(Optional.of(order));
+
+        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService, inventoryStockCoordinator);
+        var response = service.updateStatus(orderId, new UpdateRepairStatusRequest(RepairStatus.DELIVERED));
+
+        assertThat(response.status()).isEqualTo(RepairStatus.DELIVERED);
+        verifyNoInteractions(inventoryStockCoordinator);
     }
 
     @Test
