@@ -29,6 +29,9 @@ security:
   login-protection:
     max-failures: ${LOGIN_MAX_FAILURES:5}
     lock-minutes: ${LOGIN_LOCK_MINUTES:15}
+  forgot-password-protection:
+    max-requests: ${FORGOT_PASSWORD_MAX_REQUESTS:3}
+    window-minutes: ${FORGOT_PASSWORD_WINDOW_MINUTES:15}
 
 management:
   endpoint:
