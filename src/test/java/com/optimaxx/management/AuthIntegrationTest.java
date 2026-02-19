@@ -746,6 +746,91 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldCreateRepairWithReservationAndReleaseOnCancel() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        UUID customerId = UUID.randomUUID();
+        UUID transactionTypeId = UUID.randomUUID();
+        UUID repairOrderId = UUID.randomUUID();
+        UUID inventoryItemId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.Customer customer = new com.optimaxx.management.domain.model.Customer();
+        customer.setFirstName("Yusuf");
+        customer.setLastName("Orhan");
+
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        type.setCode("FRAME_REPAIR");
+        type.setActive(true);
+        type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR);
+
+        com.optimaxx.management.domain.model.InventoryItem item = new com.optimaxx.management.domain.model.InventoryItem();
+        item.setSku("SKU-1");
+        item.setQuantity(10);
+
+        com.optimaxx.management.domain.model.RepairOrder saved = new com.optimaxx.management.domain.model.RepairOrder();
+        saved.setCustomer(customer);
+        saved.setTransactionType(type);
+        saved.setTitle("Temple Fix");
+        saved.setStatus(com.optimaxx.management.domain.model.RepairStatus.RECEIVED);
+        saved.setReceivedAt(Instant.now());
+        saved.setReservedInventoryItemId(inventoryItemId);
+        saved.setReservedInventoryQuantity(2);
+        saved.setInventoryReleased(false);
+
+        when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
+        when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));
+        when(inventoryItemRepository.findByIdAndDeletedFalse(inventoryItemId)).thenReturn(Optional.of(item));
+        when(inventoryMovementRepository.findByIdempotencyKeyAndDeletedFalse(anyString())).thenReturn(Optional.empty());
+        when(repairOrderRepository.save(any(com.optimaxx.management.domain.model.RepairOrder.class))).thenReturn(saved);
+
+        String createBody = """
+                {"customerId":"%s","transactionTypeId":"%s","title":"Temple Fix","description":"left side loose","inventoryItemId":"%s","inventoryQuantity":2}
+                """.formatted(customerId, transactionTypeId, inventoryItemId);
+
+        mockMvc.perform(post("/api/v1/sales/repairs")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reservedInventoryItemId").value(inventoryItemId.toString()))
+                .andExpect(jsonPath("$.reservedInventoryQuantity").value(2))
+                .andExpect(jsonPath("$.inventoryReleased").value(false));
+
+        when(repairOrderRepository.findByIdAndDeletedFalse(repairOrderId)).thenReturn(Optional.of(saved));
+
+        mockMvc.perform(patch("/api/v1/sales/repairs/{id}/status", repairOrderId)
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CANCELED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELED"))
+                .andExpect(jsonPath("$.inventoryReleased").value(true));
+    }
+
+    @Test
+    void shouldRejectInvalidRepairStatusTransition() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        UUID repairOrderId = UUID.randomUUID();
+        com.optimaxx.management.domain.model.RepairOrder order = new com.optimaxx.management.domain.model.RepairOrder();
+        com.optimaxx.management.domain.model.Customer customer = new com.optimaxx.management.domain.model.Customer();
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        order.setCustomer(customer);
+        order.setTransactionType(type);
+        order.setTitle("Temple Fix");
+        order.setStatus(com.optimaxx.management.domain.model.RepairStatus.RECEIVED);
+        order.setReceivedAt(Instant.now());
+
+        when(repairOrderRepository.findByIdAndDeletedFalse(repairOrderId)).thenReturn(Optional.of(order));
+
+        mockMvc.perform(patch("/api/v1/sales/repairs/{id}/status", repairOrderId)
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"DELIVERED\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void shouldCreateAndChangeStockForAdminRole() throws Exception {
         String adminToken = jwtTokenService.generateAccessToken("admin1", "ADMIN");
 
