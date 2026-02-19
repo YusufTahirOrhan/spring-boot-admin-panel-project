@@ -17,6 +17,8 @@ import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.CustomerRepository;
+import com.optimaxx.management.domain.repository.InventoryItemRepository;
+import com.optimaxx.management.domain.repository.InventoryMovementRepository;
 import com.optimaxx.management.domain.repository.RepairOrderRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
@@ -91,6 +93,12 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private RepairOrderRepository repairOrderRepository;
+
+    @MockitoBean
+    private InventoryItemRepository inventoryItemRepository;
+
+    @MockitoBean
+    private InventoryMovementRepository inventoryMovementRepository;
 
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();
@@ -735,6 +743,45 @@ class AuthIntegrationTest {
                         .content("{\"status\":\"IN_PROGRESS\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    @Test
+    void shouldCreateAndChangeStockForAdminRole() throws Exception {
+        String adminToken = jwtTokenService.generateAccessToken("admin1", "ADMIN");
+
+        com.optimaxx.management.domain.model.InventoryItem item = new com.optimaxx.management.domain.model.InventoryItem();
+        item.setSku("SKU-1");
+        item.setName("Lens");
+        item.setQuantity(10);
+        item.setMinQuantity(2);
+
+        when(inventoryItemRepository.existsBySkuAndDeletedFalse("SKU-1")).thenReturn(false);
+        when(inventoryItemRepository.save(any(com.optimaxx.management.domain.model.InventoryItem.class))).thenReturn(item);
+
+        mockMvc.perform(post("/api/v1/admin/inventory/items")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sku\":\"sku-1\",\"name\":\"Lens\",\"quantity\":10,\"minQuantity\":2}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sku").value("SKU-1"));
+
+        when(inventoryItemRepository.findByDeletedFalseOrderByNameAsc()).thenReturn(java.util.List.of(item));
+
+        mockMvc.perform(get("/api/v1/admin/inventory/items")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].name").value("Lens"));
+
+        when(inventoryItemRepository.findByIdAndDeletedFalse(any(java.util.UUID.class))).thenReturn(Optional.of(item));
+        when(inventoryMovementRepository.save(any(com.optimaxx.management.domain.model.InventoryMovement.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        mockMvc.perform(post("/api/v1/admin/inventory/items/{id}/stock", java.util.UUID.randomUUID())
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"movementType\":\"OUT\",\"quantity\":3,\"reason\":\"sale\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.quantity").value(7));
     }
 
     private String extractRefreshToken(String json) {
