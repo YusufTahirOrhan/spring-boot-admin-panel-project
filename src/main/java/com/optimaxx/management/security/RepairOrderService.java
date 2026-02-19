@@ -30,15 +30,18 @@ public class RepairOrderService {
     private final CustomerRepository customerRepository;
     private final TransactionTypeRepository transactionTypeRepository;
     private final SecurityAuditService securityAuditService;
+    private final InventoryStockCoordinator inventoryStockCoordinator;
 
     public RepairOrderService(RepairOrderRepository repairOrderRepository,
                               CustomerRepository customerRepository,
                               TransactionTypeRepository transactionTypeRepository,
-                              SecurityAuditService securityAuditService) {
+                              SecurityAuditService securityAuditService,
+                              InventoryStockCoordinator inventoryStockCoordinator) {
         this.repairOrderRepository = repairOrderRepository;
         this.customerRepository = customerRepository;
         this.transactionTypeRepository = transactionTypeRepository;
         this.securityAuditService = securityAuditService;
+        this.inventoryStockCoordinator = inventoryStockCoordinator;
     }
 
     @Transactional
@@ -60,6 +63,10 @@ public class RepairOrderService {
             throw new ResponseStatusException(BAD_REQUEST, "Transaction type category must be REPAIR");
         }
 
+        if ((request.inventoryItemId() == null) != (request.inventoryQuantity() == null)) {
+            throw new ResponseStatusException(BAD_REQUEST, "inventoryItemId and inventoryQuantity must be provided together");
+        }
+
         RepairOrder order = new RepairOrder();
         order.setCustomer(customer);
         order.setTransactionType(transactionType);
@@ -71,6 +78,21 @@ public class RepairOrderService {
         order.setDeleted(false);
 
         RepairOrder saved = repairOrderRepository.save(order);
+
+        if (request.inventoryItemId() != null) {
+            var item = inventoryStockCoordinator.consume(
+                    request.inventoryItemId(),
+                    request.inventoryQuantity(),
+                    "REPAIR order " + saved.getId()
+            );
+            securityAuditService.log(
+                    AuditEventType.REPAIR_STOCK_DEDUCTED,
+                    null,
+                    "INVENTORY",
+                    item.getSku(),
+                    "{\"repairOrderId\":\"" + saved.getId() + "\",\"quantity\":" + request.inventoryQuantity() + "}"
+            );
+        }
 
         securityAuditService.log(
                 AuditEventType.REPAIR_ORDER_CREATED,

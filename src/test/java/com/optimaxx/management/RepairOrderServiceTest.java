@@ -4,9 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.optimaxx.management.domain.model.Customer;
+import com.optimaxx.management.domain.model.InventoryItem;
 import com.optimaxx.management.domain.model.RepairOrder;
 import com.optimaxx.management.domain.model.RepairStatus;
 import com.optimaxx.management.domain.model.TransactionType;
@@ -15,6 +17,7 @@ import com.optimaxx.management.domain.repository.RepairOrderRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.interfaces.rest.dto.CreateRepairOrderRequest;
 import com.optimaxx.management.interfaces.rest.dto.UpdateRepairStatusRequest;
+import com.optimaxx.management.security.InventoryStockCoordinator;
 import com.optimaxx.management.security.RepairOrderService;
 import com.optimaxx.management.security.audit.SecurityAuditService;
 import java.util.List;
@@ -32,6 +35,7 @@ class RepairOrderServiceTest {
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         TransactionTypeRepository transactionTypeRepository = Mockito.mock(TransactionTypeRepository.class);
         SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID customerId = UUID.randomUUID();
         UUID transactionTypeId = UUID.randomUUID();
@@ -49,9 +53,9 @@ class RepairOrderServiceTest {
         when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));
         when(repairOrderRepository.save(any(RepairOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService);
+        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService, inventoryStockCoordinator);
 
-        var response = service.create(new CreateRepairOrderRequest(customerId, transactionTypeId, "Temple Fix", "left side loose"));
+        var response = service.create(new CreateRepairOrderRequest(customerId, transactionTypeId, "Temple Fix", "left side loose", null, null));
 
         assertThat(response.title()).isEqualTo("Temple Fix");
         assertThat(response.status()).isEqualTo(RepairStatus.RECEIVED);
@@ -64,6 +68,7 @@ class RepairOrderServiceTest {
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         TransactionTypeRepository transactionTypeRepository = Mockito.mock(TransactionTypeRepository.class);
         SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID customerId = UUID.randomUUID();
         UUID transactionTypeId = UUID.randomUUID();
@@ -75,10 +80,70 @@ class RepairOrderServiceTest {
         type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR);
         when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));
 
-        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService);
+        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService, inventoryStockCoordinator);
 
-        assertThatThrownBy(() -> service.create(new CreateRepairOrderRequest(customerId, transactionTypeId, "Fix", null)))
+        assertThatThrownBy(() -> service.create(new CreateRepairOrderRequest(customerId, transactionTypeId, "Fix", null, null, null)))
                 .isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void shouldConsumeStockWhenInventoryPayloadPresent() {
+        RepairOrderRepository repairOrderRepository = Mockito.mock(RepairOrderRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        TransactionTypeRepository transactionTypeRepository = Mockito.mock(TransactionTypeRepository.class);
+        SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        UUID customerId = UUID.randomUUID();
+        UUID transactionTypeId = UUID.randomUUID();
+        UUID itemId = UUID.randomUUID();
+
+        Customer customer = new Customer();
+        when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
+
+        TransactionType type = new TransactionType();
+        type.setCode("FRAME_REPAIR");
+        type.setActive(true);
+        type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR);
+        when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));
+        when(repairOrderRepository.save(any(RepairOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        InventoryItem item = new InventoryItem();
+        item.setSku("SKU-1");
+        when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), any(String.class))).thenReturn(item);
+
+        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService, inventoryStockCoordinator);
+        service.create(new CreateRepairOrderRequest(customerId, transactionTypeId, "Temple Fix", "left side loose", itemId, 1));
+
+        verify(inventoryStockCoordinator).consume(
+                org.mockito.ArgumentMatchers.eq(itemId),
+                org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.contains("REPAIR order")
+        );
+    }
+
+    @Test
+    void shouldRejectPartialInventoryPayload() {
+        RepairOrderRepository repairOrderRepository = Mockito.mock(RepairOrderRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        TransactionTypeRepository transactionTypeRepository = Mockito.mock(TransactionTypeRepository.class);
+        SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        UUID customerId = UUID.randomUUID();
+        UUID transactionTypeId = UUID.randomUUID();
+
+        when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(new Customer()));
+
+        TransactionType type = new TransactionType();
+        type.setActive(true);
+        type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR);
+        when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));
+
+        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService, inventoryStockCoordinator);
+
+        assertThatThrownBy(() -> service.create(new CreateRepairOrderRequest(customerId, transactionTypeId, "Fix", null, UUID.randomUUID(), null)))
+                .isInstanceOf(ResponseStatusException.class);
+        verifyNoInteractions(inventoryStockCoordinator);
     }
 
     @Test
@@ -87,6 +152,7 @@ class RepairOrderServiceTest {
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         TransactionTypeRepository transactionTypeRepository = Mockito.mock(TransactionTypeRepository.class);
         SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID orderId = UUID.randomUUID();
         RepairOrder order = new RepairOrder();
@@ -100,7 +166,7 @@ class RepairOrderServiceTest {
         when(repairOrderRepository.findByIdAndDeletedFalse(orderId)).thenReturn(Optional.of(order));
         when(repairOrderRepository.findByDeletedFalseOrderByReceivedAtDesc()).thenReturn(List.of(order));
 
-        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService);
+        RepairOrderService service = new RepairOrderService(repairOrderRepository, customerRepository, transactionTypeRepository, securityAuditService, inventoryStockCoordinator);
 
         var response = service.updateStatus(orderId, new UpdateRepairStatusRequest(RepairStatus.IN_PROGRESS));
 

@@ -25,13 +25,16 @@ public class SalesTransactionService {
     private final SaleTransactionRepository saleTransactionRepository;
     private final TransactionTypeRepository transactionTypeRepository;
     private final SecurityAuditService securityAuditService;
+    private final InventoryStockCoordinator inventoryStockCoordinator;
 
     public SalesTransactionService(SaleTransactionRepository saleTransactionRepository,
                                    TransactionTypeRepository transactionTypeRepository,
-                                   SecurityAuditService securityAuditService) {
+                                   SecurityAuditService securityAuditService,
+                                   InventoryStockCoordinator inventoryStockCoordinator) {
         this.saleTransactionRepository = saleTransactionRepository;
         this.transactionTypeRepository = transactionTypeRepository;
         this.securityAuditService = securityAuditService;
+        this.inventoryStockCoordinator = inventoryStockCoordinator;
     }
 
     @Transactional
@@ -53,6 +56,10 @@ public class SalesTransactionService {
             throw new ResponseStatusException(BAD_REQUEST, "Transaction type category must be SALE");
         }
 
+        if ((request.inventoryItemId() == null) != (request.inventoryQuantity() == null)) {
+            throw new ResponseStatusException(BAD_REQUEST, "inventoryItemId and inventoryQuantity must be provided together");
+        }
+
         SaleTransaction saleTransaction = new SaleTransaction();
         saleTransaction.setTransactionType(transactionType);
         saleTransaction.setCustomerName(request.customerName().trim());
@@ -63,6 +70,22 @@ public class SalesTransactionService {
         saleTransaction.setDeleted(false);
 
         SaleTransaction saved = saleTransactionRepository.save(saleTransaction);
+
+        if (request.inventoryItemId() != null) {
+            var item = inventoryStockCoordinator.consume(
+                    request.inventoryItemId(),
+                    request.inventoryQuantity(),
+                    "SALE transaction " + saved.getId()
+            );
+            securityAuditService.log(
+                    AuditEventType.SALE_STOCK_DEDUCTED,
+                    null,
+                    "INVENTORY",
+                    item.getSku(),
+                    "{\"saleTransactionId\":\"" + saved.getId() + "\",\"quantity\":" + request.inventoryQuantity() + "}"
+            );
+        }
+
         securityAuditService.log(
                 AuditEventType.SALE_TRANSACTION_CREATED,
                 null,
