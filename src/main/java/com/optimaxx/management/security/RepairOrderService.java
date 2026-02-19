@@ -127,6 +127,7 @@ public class RepairOrderService {
         RepairOrder order = repairOrderRepository.findByIdAndDeletedFalse(repairOrderId)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Repair order not found"));
 
+        validateStatusTransition(order.getStatus(), request.status());
         order.setStatus(request.status());
 
         if (request.status() == RepairStatus.CANCELED
@@ -171,8 +172,29 @@ public class RepairOrderService {
                 order.getTitle(),
                 order.getDescription(),
                 order.getStatus(),
-                order.getReceivedAt()
+                order.getReceivedAt(),
+                order.getReservedInventoryItemId(),
+                order.getReservedInventoryQuantity(),
+                order.isInventoryReleased()
         );
+    }
+
+    private void validateStatusTransition(RepairStatus current, RepairStatus next) {
+        if (current == next) {
+            return;
+        }
+
+        boolean valid = switch (current) {
+            case RECEIVED -> next == RepairStatus.IN_PROGRESS || next == RepairStatus.CANCELED;
+            case IN_PROGRESS -> next == RepairStatus.READY_FOR_PICKUP || next == RepairStatus.CANCELED;
+            case READY_FOR_PICKUP -> next == RepairStatus.DELIVERED;
+            case DELIVERED, CANCELED -> false;
+        };
+
+        if (!valid) {
+            throw new ResponseStatusException(BAD_REQUEST,
+                    "Invalid status transition: " + current + " -> " + next);
+        }
     }
 
     private String trimToNull(String value) {
