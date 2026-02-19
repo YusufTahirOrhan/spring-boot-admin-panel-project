@@ -4,6 +4,7 @@ import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
 import com.optimaxx.management.domain.repository.CustomerRepository;
+import com.optimaxx.management.domain.repository.RepairOrderRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
@@ -44,6 +45,9 @@ class OptiMaxxManagementApplicationTests {
 
     @MockitoBean
     private CustomerRepository customerRepository;
+
+    @MockitoBean
+    private RepairOrderRepository repairOrderRepository;
 
     @Test
     void contextLoads() {
