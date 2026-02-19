@@ -15,6 +15,7 @@ import com.optimaxx.management.domain.model.UserRole;
 import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
+import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
 import com.optimaxx.management.security.ForgotPasswordAttemptService;
 import com.optimaxx.management.security.LoginAttemptService;
@@ -74,6 +75,9 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @MockitoBean
+    private TransactionTypeRepository transactionTypeRepository;
 
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();
