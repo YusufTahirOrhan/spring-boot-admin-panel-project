@@ -76,6 +76,9 @@ public class RepairOrderService {
         order.setReceivedAt(Instant.now());
         order.setStoreId(UUID.randomUUID());
         order.setDeleted(false);
+        order.setReservedInventoryItemId(request.inventoryItemId());
+        order.setReservedInventoryQuantity(request.inventoryQuantity());
+        order.setInventoryReleased(false);
 
         RepairOrder saved = repairOrderRepository.save(order);
 
@@ -83,7 +86,10 @@ public class RepairOrderService {
             var item = inventoryStockCoordinator.consume(
                     request.inventoryItemId(),
                     request.inventoryQuantity(),
-                    "REPAIR order " + saved.getId()
+                    "REPAIR reservation " + saved.getId(),
+                    "REPAIR_ORDER_RESERVATION",
+                    saved.getId(),
+                    "repair:" + saved.getId() + ":reserve"
             );
             securityAuditService.log(
                     AuditEventType.REPAIR_STOCK_DEDUCTED,
@@ -122,6 +128,29 @@ public class RepairOrderService {
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Repair order not found"));
 
         order.setStatus(request.status());
+
+        if (request.status() == RepairStatus.CANCELED
+                && order.getReservedInventoryItemId() != null
+                && order.getReservedInventoryQuantity() != null
+                && !order.isInventoryReleased()) {
+            var item = inventoryStockCoordinator.release(
+                    order.getReservedInventoryItemId(),
+                    order.getReservedInventoryQuantity(),
+                    "REPAIR reservation release " + order.getId(),
+                    "REPAIR_ORDER_RELEASE",
+                    order.getId(),
+                    "repair:" + order.getId() + ":release"
+            );
+            order.setInventoryReleased(true);
+
+            securityAuditService.log(
+                    AuditEventType.REPAIR_STOCK_RELEASED,
+                    null,
+                    "INVENTORY",
+                    item.getSku(),
+                    "{\"repairOrderId\":\"" + order.getId() + "\",\"quantity\":" + order.getReservedInventoryQuantity() + "}"
+            );
+        }
 
         securityAuditService.log(
                 AuditEventType.REPAIR_STATUS_UPDATED,

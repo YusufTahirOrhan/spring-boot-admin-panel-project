@@ -35,6 +35,15 @@ public class RepairOrder extends BaseEntity {
     @Column(name = "received_at", nullable = false)
     private Instant receivedAt;
 
+    @Column(name = "reserved_inventory_item_id")
+    private java.util.UUID reservedInventoryItemId;
+
+    @Column(name = "reserved_inventory_quantity")
+    private Integer reservedInventoryQuantity;
+
+    @Column(name = "inventory_released", nullable = false)
+    private boolean inventoryReleased;
+
     public Customer getCustomer() {
         return customer;
     }
@@ -81,5 +90,29 @@ public class RepairOrder extends BaseEntity {
 
     public void setReceivedAt(Instant receivedAt) {
         this.receivedAt = receivedAt;
+    }
+
+    public java.util.UUID getReservedInventoryItemId() {
+        return reservedInventoryItemId;
+    }
+
+    public void setReservedInventoryItemId(java.util.UUID reservedInventoryItemId) {
+        this.reservedInventoryItemId = reservedInventoryItemId;
+    }
+
+    public Integer getReservedInventoryQuantity() {
+        return reservedInventoryQuantity;
+    }
+
+    public void setReservedInventoryQuantity(Integer reservedInventoryQuantity) {
+        this.reservedInventoryQuantity = reservedInventoryQuantity;
+    }
+
+    public boolean isInventoryReleased() {
+        return inventoryReleased;
+    }
+
+    public void setInventoryReleased(boolean inventoryReleased) {
+        this.inventoryReleased = inventoryReleased;
     }
 }
