@@ -33,9 +33,9 @@ class TransactionTypeManagementServiceTest {
             return item;
         });
 
-        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService);
+        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService, new com.optimaxx.management.security.TransactionTypeMetadataValidator());
 
-        var response = service.create(new AdminCreateTransactionTypeRequest("glass_sale", "Glass Sale", true, 1, com.optimaxx.management.domain.model.TransactionTypeCategory.SALE, "{\"channel\":\"retail\"}"));
+        var response = service.create(new AdminCreateTransactionTypeRequest("glass_sale", "Glass Sale", true, 1, com.optimaxx.management.domain.model.TransactionTypeCategory.SALE, "{\"receiptTemplate\":\"default\"}"));
 
         assertThat(response.code()).isEqualTo("GLASS_SALE");
         assertThat(response.name()).isEqualTo("Glass Sale");
@@ -49,9 +49,9 @@ class TransactionTypeManagementServiceTest {
 
         when(repository.existsByCodeAndDeletedFalse("GLASS_SALE")).thenReturn(true);
 
-        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService);
+        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService, new com.optimaxx.management.security.TransactionTypeMetadataValidator());
 
-        assertThatThrownBy(() -> service.create(new AdminCreateTransactionTypeRequest("glass_sale", "Glass Sale", true, 1, com.optimaxx.management.domain.model.TransactionTypeCategory.SALE, "{\"channel\":\"retail\"}")))
+        assertThatThrownBy(() -> service.create(new AdminCreateTransactionTypeRequest("glass_sale", "Glass Sale", true, 1, com.optimaxx.management.domain.model.TransactionTypeCategory.SALE, "{\"receiptTemplate\":\"default\"}")))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -68,9 +68,47 @@ class TransactionTypeManagementServiceTest {
 
         when(repository.findByActiveTrueAndDeletedFalseOrderBySortOrderAscNameAsc()).thenReturn(List.of(active));
 
-        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService);
+        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService, new com.optimaxx.management.security.TransactionTypeMetadataValidator());
 
         assertThat(service.listSales()).hasSize(1);
+    }
+
+    @Test
+    void shouldRejectCreateWhenMetadataJsonIsInvalid() {
+        TransactionTypeRepository repository = Mockito.mock(TransactionTypeRepository.class);
+        SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+
+        when(repository.existsByCodeAndDeletedFalse("GLASS_SALE")).thenReturn(false);
+
+        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService, new com.optimaxx.management.security.TransactionTypeMetadataValidator());
+
+        assertThatThrownBy(() -> service.create(new AdminCreateTransactionTypeRequest(
+                "glass_sale",
+                "Glass Sale",
+                true,
+                1,
+                com.optimaxx.management.domain.model.TransactionTypeCategory.SALE,
+                "not-json"
+        ))).isInstanceOf(ResponseStatusException.class);
+    }
+
+    @Test
+    void shouldRejectCreateWhenRequiredMetadataKeyIsMissing() {
+        TransactionTypeRepository repository = Mockito.mock(TransactionTypeRepository.class);
+        SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+
+        when(repository.existsByCodeAndDeletedFalse("FRAME_REPAIR")).thenReturn(false);
+
+        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService, new com.optimaxx.management.security.TransactionTypeMetadataValidator());
+
+        assertThatThrownBy(() -> service.create(new AdminCreateTransactionTypeRequest(
+                "frame_repair",
+                "Frame Repair",
+                true,
+                1,
+                com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR,
+                "{\"anything\":\"x\"}"
+        ))).isInstanceOf(ResponseStatusException.class);
     }
 
     @Test
@@ -87,9 +125,9 @@ class TransactionTypeManagementServiceTest {
 
         when(repository.findByIdAndDeletedFalse(id)).thenReturn(Optional.of(transactionType));
 
-        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService);
+        TransactionTypeManagementService service = new TransactionTypeManagementService(repository, securityAuditService, new com.optimaxx.management.security.TransactionTypeMetadataValidator());
 
-        var response = service.update(id, new AdminUpdateTransactionTypeRequest("Repair Service", false, 5, com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR, "{\"requiresSerial\":true}"));
+        var response = service.update(id, new AdminUpdateTransactionTypeRequest("Repair Service", false, 5, com.optimaxx.management.domain.model.TransactionTypeCategory.REPAIR, "{\"workflow\":\"default\"}"));
 
         assertThat(response.name()).isEqualTo("Repair Service");
         assertThat(response.active()).isFalse();
