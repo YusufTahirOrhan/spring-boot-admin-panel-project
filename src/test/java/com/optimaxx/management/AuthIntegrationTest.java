@@ -15,6 +15,7 @@ import com.optimaxx.management.domain.model.UserRole;
 import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.PasswordResetTokenRepository;
 import com.optimaxx.management.domain.repository.RefreshTokenRepository;
+import com.optimaxx.management.domain.repository.CustomerRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
@@ -82,6 +83,9 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private SaleTransactionRepository saleTransactionRepository;
+
+    @MockitoBean
+    private CustomerRepository customerRepository;
 
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();
@@ -616,6 +620,53 @@ class AuthIntegrationTest {
                 """.formatted(transactionTypeId);
 
         mockMvc.perform(post("/api/v1/sales/transactions")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldCreateAndListSalesCustomersForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        com.optimaxx.management.domain.model.Customer saved = new com.optimaxx.management.domain.model.Customer();
+        saved.setFirstName("Yusuf");
+        saved.setLastName("Orhan");
+        saved.setPhone("555");
+        saved.setEmail("yusuf@example.com");
+        saved.setNotes("vip");
+
+        when(customerRepository.save(any(com.optimaxx.management.domain.model.Customer.class))).thenReturn(saved);
+
+        String createBody = """
+                {"firstName":"Yusuf","lastName":"Orhan","phone":"555","email":"yusuf@example.com","notes":"vip"}
+                """;
+
+        mockMvc.perform(post("/api/v1/sales/customers")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName").value("Yusuf"));
+
+        when(customerRepository.findByDeletedFalseOrderByCreatedAtDesc()).thenReturn(java.util.List.of(saved));
+
+        mockMvc.perform(get("/api/v1/sales/customers")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].lastName").value("Orhan"));
+    }
+
+    @Test
+    void shouldRejectSalesCustomerCreateForMissingNames() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        String createBody = """
+                {"firstName":"","lastName":""}
+                """;
+
+        mockMvc.perform(post("/api/v1/sales/customers")
                         .header("Authorization", "Bearer " + staffToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody))
