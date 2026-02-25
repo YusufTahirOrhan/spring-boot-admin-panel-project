@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public record CreateSaleTransactionRequest(UUID transactionTypeId,
+                                           UUID customerId,
                                            String customerName,
                                            BigDecimal amount,
                                            String notes,
