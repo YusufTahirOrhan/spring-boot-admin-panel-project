@@ -26,10 +26,14 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -152,7 +156,20 @@ public class SalesTransactionService {
     }
 
     @Transactional(readOnly = true)
-    public List<SaleTransactionResponse> list(Instant from, String query, String paymentMethod) {
+    public Page<SaleTransactionResponse> list(Instant from,
+                                              Instant to,
+                                              String query,
+                                              String paymentMethod,
+                                              int page,
+                                              int size,
+                                              String sort) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ResponseStatusException(BAD_REQUEST, "from cannot be after to");
+        }
+        if (page < 0 || size <= 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "page must be >= 0 and size must be > 0");
+        }
+
         List<SaleTransaction> transactions = from == null
                 ? saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()
                 : saleTransactionRepository.findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(from);
@@ -161,12 +178,18 @@ public class SalesTransactionService {
         String normalizedQuery = trimToNull(query);
         SalePaymentMethod paymentMethodFilter = parsePaymentMethod(paymentMethod);
 
-        return transactions.stream()
+        List<SaleTransactionResponse> filtered = transactions.stream()
                 .filter(transaction -> (transaction.getStoreId() == null || storeId.equals(transaction.getStoreId())))
+                .filter(transaction -> to == null || !transaction.getOccurredAt().isAfter(to))
                 .filter(transaction -> matchesQuery(transaction, normalizedQuery))
                 .filter(transaction -> paymentMethodFilter == null || transaction.getPaymentMethod() == paymentMethodFilter)
+                .sorted(resolveSort(sort))
                 .map(this::toResponse)
                 .toList();
+
+        int fromIndex = Math.min(page * size, filtered.size());
+        int toIndex = Math.min(fromIndex + size, filtered.size());
+        return new PageImpl<>(filtered.subList(fromIndex, toIndex), PageRequest.of(page, size), filtered.size());
     }
 
     @Transactional(readOnly = true)
@@ -435,6 +458,30 @@ public class SalesTransactionService {
         String customerName = transaction.getCustomerName() == null ? "" : transaction.getCustomerName().toLowerCase(Locale.ROOT);
         String receiptNumber = transaction.getReceiptNumber() == null ? "" : transaction.getReceiptNumber().toLowerCase(Locale.ROOT);
         return customerName.contains(q) || receiptNumber.contains(q);
+    }
+
+    private Comparator<SaleTransaction> resolveSort(String sort) {
+        String normalized = trimToNull(sort);
+        String field = "occurredAt";
+        String direction = "desc";
+
+        if (normalized != null) {
+            String[] parts = normalized.split(",");
+            field = parts[0].trim();
+            if (parts.length > 1) {
+                direction = parts[1].trim().toLowerCase(Locale.ROOT);
+            }
+        }
+
+        Comparator<SaleTransaction> comparator = switch (field) {
+            case "amount" -> Comparator.comparing(SaleTransaction::getAmount, Comparator.nullsLast(BigDecimal::compareTo));
+            case "receiptNumber" -> Comparator.comparing(SaleTransaction::getReceiptNumber, Comparator.nullsLast(String::compareTo));
+            case "customerName" -> Comparator.comparing(SaleTransaction::getCustomerName, Comparator.nullsLast(String::compareTo));
+            case "occurredAt" -> Comparator.comparing(SaleTransaction::getOccurredAt, Comparator.nullsLast(Instant::compareTo));
+            default -> throw new ResponseStatusException(BAD_REQUEST, "Unsupported sort field");
+        };
+
+        return "asc".equals(direction) ? comparator : comparator.reversed();
     }
 
     private SalePaymentMethod parsePaymentMethodOrDefault(String value) {

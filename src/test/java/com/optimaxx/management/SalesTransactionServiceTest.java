@@ -369,10 +369,10 @@ class SalesTransactionServiceTest {
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
 
-        assertThat(service.list(null, null, null)).hasSize(1);
-        assertThat(service.list(null, "20260225", null)).hasSize(1);
-        assertThat(service.list(null, "missing", null)).isEmpty();
-        assertThat(service.list(null, null, "CARD")).hasSize(1);
-        assertThat(service.list(null, null, "CASH")).isEmpty();
+        assertThat(service.list(null, null, null, null, 0, 20, "occurredAt,desc").getContent()).hasSize(1);
+        assertThat(service.list(null, null, "20260225", null, 0, 20, "occurredAt,desc").getContent()).hasSize(1);
+        assertThat(service.list(null, null, "missing", null, 0, 20, "occurredAt,desc").getContent()).isEmpty();
+        assertThat(service.list(null, null, null, "CARD", 0, 20, "occurredAt,desc").getContent()).hasSize(1);
+        assertThat(service.list(null, null, null, "CASH", 0, 20, "occurredAt,desc").getContent()).isEmpty();
     }
 }
