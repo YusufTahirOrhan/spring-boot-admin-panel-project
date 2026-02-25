@@ -106,6 +106,9 @@ class AuthIntegrationTest {
     @MockitoBean
     private InventoryMovementRepository inventoryMovementRepository;
 
+    @MockitoBean
+    private com.optimaxx.management.security.InventoryStockCoordinator inventoryStockCoordinator;
+
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();
 
@@ -146,6 +149,13 @@ class AuthIntegrationTest {
                             .filter(token -> token.getExpiresAt() != null && token.getExpiresAt().isAfter(now))
                             .toList();
                 });
+
+        com.optimaxx.management.domain.model.InventoryItem stockItem = new com.optimaxx.management.domain.model.InventoryItem();
+        stockItem.setSku("SKU-STUB");
+        when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), anyString(), anyString(), org.mockito.ArgumentMatchers.nullable(UUID.class), anyString()))
+                .thenReturn(stockItem);
+        when(inventoryStockCoordinator.release(any(UUID.class), any(Integer.class), anyString(), anyString(), org.mockito.ArgumentMatchers.nullable(UUID.class), anyString()))
+                .thenReturn(stockItem);
     }
 
     @Test
@@ -667,6 +677,32 @@ class AuthIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].customerName").value("Yusuf"))
                 .andExpect(jsonPath("$[0].receiptNumber").value("RCP-20260225-0001"));
+    }
+
+    @Test
+    void shouldCancelSalesTransactionForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+        UUID transactionId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        type.setCode("GLASS_SALE");
+
+        com.optimaxx.management.domain.model.SaleTransaction tx = new com.optimaxx.management.domain.model.SaleTransaction();
+        tx.setTransactionType(type);
+        tx.setStatus(com.optimaxx.management.domain.model.SaleTransactionStatus.COMPLETED);
+        tx.setInventoryItemId(UUID.randomUUID());
+        tx.setInventoryQuantity(1);
+
+        when(saleTransactionRepository.findByIdAndDeletedFalse(transactionId)).thenReturn(Optional.of(tx));
+        when(inventoryStockCoordinator.release(any(UUID.class), any(Integer.class), anyString(), anyString(), any(UUID.class), anyString()))
+                .thenReturn(new com.optimaxx.management.domain.model.InventoryItem());
+
+        mockMvc.perform(patch("/api/v1/sales/transactions/{id}/status", transactionId)
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" + "\"status\":\"CANCELED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CANCELED"));
     }
 
     @Test

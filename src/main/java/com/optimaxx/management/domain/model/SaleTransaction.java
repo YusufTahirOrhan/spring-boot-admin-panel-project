@@ -5,6 +5,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import java.math.BigDecimal;
@@ -30,6 +32,19 @@ public class SaleTransaction extends BaseEntity {
 
     @Column(name = "receipt_number", length = 32)
     private String receiptNumber;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false, length = 20)
+    private SaleTransactionStatus status;
+
+    @Column(name = "inventory_item_id")
+    private UUID inventoryItemId;
+
+    @Column(name = "inventory_quantity")
+    private Integer inventoryQuantity;
+
+    @Column(name = "stock_reverted", nullable = false)
+    private boolean stockReverted;
 
     @Column(name = "notes", length = 500)
     private String notes;
@@ -79,6 +94,38 @@ public class SaleTransaction extends BaseEntity {
 
     public void setReceiptNumber(String receiptNumber) {
         this.receiptNumber = receiptNumber;
+    }
+
+    public SaleTransactionStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(SaleTransactionStatus status) {
+        this.status = status;
+    }
+
+    public UUID getInventoryItemId() {
+        return inventoryItemId;
+    }
+
+    public void setInventoryItemId(UUID inventoryItemId) {
+        this.inventoryItemId = inventoryItemId;
+    }
+
+    public Integer getInventoryQuantity() {
+        return inventoryQuantity;
+    }
+
+    public void setInventoryQuantity(Integer inventoryQuantity) {
+        this.inventoryQuantity = inventoryQuantity;
+    }
+
+    public boolean isStockReverted() {
+        return stockReverted;
+    }
+
+    public void setStockReverted(boolean stockReverted) {
+        this.stockReverted = stockReverted;
     }
 
     public String getNotes() {
