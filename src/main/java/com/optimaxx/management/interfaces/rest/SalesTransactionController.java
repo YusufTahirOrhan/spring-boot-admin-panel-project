@@ -37,8 +37,9 @@ public class SalesTransactionController {
     @GetMapping
     public List<SaleTransactionResponse> list(@RequestParam(value = "from", required = false)
                                               @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
-                                              @RequestParam(value = "q", required = false) String query) {
-        return salesTransactionService.list(from, query);
+                                              @RequestParam(value = "q", required = false) String query,
+                                              @RequestParam(value = "paymentMethod", required = false) String paymentMethod) {
+        return salesTransactionService.list(from, query, paymentMethod);
     }
 
     @GetMapping("/{transactionId}")

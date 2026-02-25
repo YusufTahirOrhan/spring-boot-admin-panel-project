@@ -63,7 +63,7 @@ class SalesTransactionServiceTest {
                 auditService,
                 inventoryStockCoordinator
         );
-        var response = service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("1500.00"), "progressive lens", null, null));
+        var response = service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("1500.00"), "progressive lens", null, null, null, null));
 
         assertThat(response.transactionTypeCode()).isEqualTo("GLASS_SALE");
         assertThat(response.customerName()).isEqualTo("Yusuf");
@@ -109,7 +109,7 @@ class SalesTransactionServiceTest {
                 inventoryStockCoordinator
         );
 
-        var response = service.create(new CreateSaleTransactionRequest(typeId, customerId, null, new BigDecimal("1500.00"), null, null, null));
+        var response = service.create(new CreateSaleTransactionRequest(typeId, customerId, null, new BigDecimal("1500.00"), null, null, null, null, null));
 
         assertThat(response.customerName()).isEqualTo("Yusuf Orhan");
     }
@@ -132,7 +132,7 @@ class SalesTransactionServiceTest {
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
 
-        assertThatThrownBy(() -> service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("1200.00"), null, null, null)))
+        assertThatThrownBy(() -> service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("1200.00"), null, null, null, null, null)))
                 .isInstanceOf(ResponseStatusException.class);
     }
 
@@ -161,7 +161,7 @@ class SalesTransactionServiceTest {
         when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), any(String.class), any(String.class), org.mockito.ArgumentMatchers.nullable(UUID.class), any(String.class))).thenReturn(item);
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
-        service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("1500.00"), "progressive lens", itemId, 2));
+        service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("1500.00"), "progressive lens", "CARD", "POS-REF-1", itemId, 2));
 
         verify(inventoryStockCoordinator).consume(
                 org.mockito.ArgumentMatchers.eq(itemId),
@@ -191,7 +191,7 @@ class SalesTransactionServiceTest {
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
 
-        assertThatThrownBy(() -> service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("100.00"), null, UUID.randomUUID(), null)))
+        assertThatThrownBy(() -> service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("100.00"), null, null, null, UUID.randomUUID(), null)))
                 .isInstanceOf(ResponseStatusException.class);
         verifyNoInteractions(inventoryStockCoordinator);
     }
@@ -322,14 +322,17 @@ class SalesTransactionServiceTest {
         sale.setCustomerName("Customer A");
         sale.setReceiptNumber("RCP-20260225-0001");
         sale.setAmount(new BigDecimal("250.00"));
+        sale.setPaymentMethod(com.optimaxx.management.domain.model.SalePaymentMethod.CARD);
         sale.setOccurredAt(Instant.now());
 
         when(saleRepository.findByDeletedFalseOrderByOccurredAtDesc()).thenReturn(List.of(sale));
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
 
-        assertThat(service.list(null, null)).hasSize(1);
-        assertThat(service.list(null, "20260225")).hasSize(1);
-        assertThat(service.list(null, "missing")).isEmpty();
+        assertThat(service.list(null, null, null)).hasSize(1);
+        assertThat(service.list(null, "20260225", null)).hasSize(1);
+        assertThat(service.list(null, "missing", null)).isEmpty();
+        assertThat(service.list(null, null, "CARD")).hasSize(1);
+        assertThat(service.list(null, null, "CASH")).isEmpty();
     }
 }

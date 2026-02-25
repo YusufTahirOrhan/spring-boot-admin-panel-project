@@ -8,6 +8,8 @@ public record CreateSaleTransactionRequest(UUID transactionTypeId,
                                            String customerName,
                                            BigDecimal amount,
                                            String notes,
+                                           String paymentMethod,
+                                           String paymentReference,
                                            UUID inventoryItemId,
                                            Integer inventoryQuantity) {
 }

@@ -1,6 +1,7 @@
 package com.optimaxx.management.security;
 
 import com.optimaxx.management.domain.model.Customer;
+import com.optimaxx.management.domain.model.SalePaymentMethod;
 import com.optimaxx.management.domain.model.SaleTransaction;
 import com.optimaxx.management.domain.model.SaleTransactionStatus;
 import com.optimaxx.management.domain.model.ActivityLog;
@@ -106,6 +107,8 @@ public class SalesTransactionService {
         saleTransaction.setCustomerName(customerName);
         saleTransaction.setAmount(request.amount());
         saleTransaction.setNotes(isBlank(request.notes()) ? null : request.notes().trim());
+        saleTransaction.setPaymentMethod(parsePaymentMethodOrDefault(request.paymentMethod()));
+        saleTransaction.setPaymentReference(trimToNull(request.paymentReference()));
         saleTransaction.setOccurredAt(Instant.now());
         saleTransaction.setStoreId(storeId);
         saleTransaction.setReceiptNumber(generateReceiptNumber(storeId));
@@ -140,23 +143,25 @@ public class SalesTransactionService {
                 null,
                 "SALE_TRANSACTION",
                 String.valueOf(saved.getId()),
-                "{\"transactionType\":\"" + transactionType.getCode() + "\",\"amount\":" + request.amount() + "}"
+                "{\"transactionType\":\"" + transactionType.getCode() + "\",\"amount\":" + request.amount() + ",\"paymentMethod\":\"" + saleTransaction.getPaymentMethod().name() + "\"}"
         );
         return toResponse(saved);
     }
 
     @Transactional(readOnly = true)
-    public List<SaleTransactionResponse> list(Instant from, String query) {
+    public List<SaleTransactionResponse> list(Instant from, String query, String paymentMethod) {
         List<SaleTransaction> transactions = from == null
                 ? saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()
                 : saleTransactionRepository.findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(from);
 
         var storeId = StoreContext.currentStoreId();
         String normalizedQuery = trimToNull(query);
+        SalePaymentMethod paymentMethodFilter = parsePaymentMethod(paymentMethod);
 
         return transactions.stream()
                 .filter(transaction -> (transaction.getStoreId() == null || storeId.equals(transaction.getStoreId())))
                 .filter(transaction -> matchesQuery(transaction, normalizedQuery))
+                .filter(transaction -> paymentMethodFilter == null || transaction.getPaymentMethod() == paymentMethodFilter)
                 .map(this::toResponse)
                 .toList();
     }
@@ -286,6 +291,8 @@ public class SalesTransactionService {
                 transaction.getTransactionType().getCode(),
                 transaction.getReceiptNumber(),
                 transaction.getStatus() == null ? SaleTransactionStatus.COMPLETED.name() : transaction.getStatus().name(),
+                transaction.getPaymentMethod() == null ? SalePaymentMethod.CASH.name() : transaction.getPaymentMethod().name(),
+                transaction.getPaymentReference(),
                 transaction.getCustomerId(),
                 transaction.getCustomerName(),
                 transaction.getAmount(),
@@ -305,6 +312,8 @@ public class SalesTransactionService {
                 transaction.getTransactionType().getCode(),
                 transaction.getReceiptNumber(),
                 transaction.getStatus() == null ? SaleTransactionStatus.COMPLETED.name() : transaction.getStatus().name(),
+                transaction.getPaymentMethod() == null ? SalePaymentMethod.CASH.name() : transaction.getPaymentMethod().name(),
+                transaction.getPaymentReference(),
                 transaction.getCustomerId(),
                 transaction.getCustomerName(),
                 transaction.getAmount(),
@@ -363,6 +372,23 @@ public class SalesTransactionService {
         String customerName = transaction.getCustomerName() == null ? "" : transaction.getCustomerName().toLowerCase(Locale.ROOT);
         String receiptNumber = transaction.getReceiptNumber() == null ? "" : transaction.getReceiptNumber().toLowerCase(Locale.ROOT);
         return customerName.contains(q) || receiptNumber.contains(q);
+    }
+
+    private SalePaymentMethod parsePaymentMethodOrDefault(String value) {
+        SalePaymentMethod parsed = parsePaymentMethod(value);
+        return parsed == null ? SalePaymentMethod.CASH : parsed;
+    }
+
+    private SalePaymentMethod parsePaymentMethod(String value) {
+        String normalized = trimToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return SalePaymentMethod.valueOf(normalized.toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(BAD_REQUEST, "Unsupported payment method");
+        }
     }
 
     private String trimToNull(String value) {

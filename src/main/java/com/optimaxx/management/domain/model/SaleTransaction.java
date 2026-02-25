@@ -37,6 +37,13 @@ public class SaleTransaction extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private SaleTransactionStatus status;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "payment_method", nullable = false, length = 20)
+    private SalePaymentMethod paymentMethod;
+
+    @Column(name = "payment_reference", length = 128)
+    private String paymentReference;
+
     @Column(name = "inventory_item_id")
     private UUID inventoryItemId;
 
@@ -108,6 +115,22 @@ public class SaleTransaction extends BaseEntity {
 
     public void setStatus(SaleTransactionStatus status) {
         this.status = status;
+    }
+
+    public SalePaymentMethod getPaymentMethod() {
+        return paymentMethod;
+    }
+
+    public void setPaymentMethod(SalePaymentMethod paymentMethod) {
+        this.paymentMethod = paymentMethod;
+    }
+
+    public String getPaymentReference() {
+        return paymentReference;
+    }
+
+    public void setPaymentReference(String paymentReference) {
+        this.paymentReference = paymentReference;
     }
 
     public UUID getInventoryItemId() {
