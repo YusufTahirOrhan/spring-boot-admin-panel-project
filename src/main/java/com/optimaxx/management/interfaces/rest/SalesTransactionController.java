@@ -2,6 +2,7 @@ package com.optimaxx.management.interfaces.rest;
 
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
+import com.optimaxx.management.interfaces.rest.dto.SaleTransactionDetailResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateSaleTransactionStatusRequest;
 import com.optimaxx.management.security.SalesTransactionService;
@@ -38,6 +39,11 @@ public class SalesTransactionController {
                                               @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
                                               @RequestParam(value = "q", required = false) String query) {
         return salesTransactionService.list(from, query);
+    }
+
+    @GetMapping("/{transactionId}")
+    public SaleTransactionDetailResponse detail(@PathVariable UUID transactionId) {
+        return salesTransactionService.detail(transactionId);
     }
 
     @PatchMapping("/{transactionId}/status")

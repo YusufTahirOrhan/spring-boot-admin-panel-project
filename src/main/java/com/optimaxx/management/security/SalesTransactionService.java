@@ -3,14 +3,18 @@ package com.optimaxx.management.security;
 import com.optimaxx.management.domain.model.Customer;
 import com.optimaxx.management.domain.model.SaleTransaction;
 import com.optimaxx.management.domain.model.SaleTransactionStatus;
+import com.optimaxx.management.domain.model.ActivityLog;
 import com.optimaxx.management.domain.model.TransactionType;
 import com.optimaxx.management.domain.model.TransactionTypeCategory;
+import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.CustomerRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
+import com.optimaxx.management.interfaces.rest.dto.SaleTransactionDetailResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
+import com.optimaxx.management.interfaces.rest.dto.SaleTransactionTimelineEventResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateSaleTransactionStatusRequest;
 import com.optimaxx.management.security.audit.AuditEventType;
 import com.optimaxx.management.security.audit.SecurityAuditService;
@@ -35,17 +39,20 @@ public class SalesTransactionService {
     private final SaleTransactionRepository saleTransactionRepository;
     private final TransactionTypeRepository transactionTypeRepository;
     private final CustomerRepository customerRepository;
+    private final ActivityLogRepository activityLogRepository;
     private final SecurityAuditService securityAuditService;
     private final InventoryStockCoordinator inventoryStockCoordinator;
 
     public SalesTransactionService(SaleTransactionRepository saleTransactionRepository,
                                    TransactionTypeRepository transactionTypeRepository,
                                    CustomerRepository customerRepository,
+                                   ActivityLogRepository activityLogRepository,
                                    SecurityAuditService securityAuditService,
                                    InventoryStockCoordinator inventoryStockCoordinator) {
         this.saleTransactionRepository = saleTransactionRepository;
         this.transactionTypeRepository = transactionTypeRepository;
         this.customerRepository = customerRepository;
+        this.activityLogRepository = activityLogRepository;
         this.securityAuditService = securityAuditService;
         this.inventoryStockCoordinator = inventoryStockCoordinator;
     }
@@ -152,6 +159,29 @@ public class SalesTransactionService {
                 .filter(transaction -> matchesQuery(transaction, normalizedQuery))
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public SaleTransactionDetailResponse detail(UUID transactionId) {
+        SaleTransaction transaction = saleTransactionRepository.findByIdAndDeletedFalse(transactionId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Sale transaction not found"));
+
+        UUID storeId = StoreContext.currentStoreId();
+        if (transaction.getStoreId() != null && !storeId.equals(transaction.getStoreId())) {
+            throw new ResponseStatusException(NOT_FOUND, "Sale transaction not found");
+        }
+
+        List<SaleTransactionTimelineEventResponse> timeline = activityLogRepository
+                .findByStoreIdAndResourceTypeAndResourceIdAndDeletedFalseOrderByOccurredAtDesc(
+                        storeId,
+                        "SALE_TRANSACTION",
+                        String.valueOf(transactionId)
+                )
+                .stream()
+                .map(this::toTimelineResponse)
+                .toList();
+
+        return toDetailResponse(transaction, transactionId, timeline);
     }
 
     @Transactional
@@ -263,6 +293,37 @@ public class SalesTransactionService {
                 transaction.getRefundedAt(),
                 transaction.getNotes(),
                 transaction.getOccurredAt()
+        );
+    }
+
+    private SaleTransactionDetailResponse toDetailResponse(SaleTransaction transaction,
+                                                           UUID fallbackId,
+                                                           List<SaleTransactionTimelineEventResponse> timeline) {
+        return new SaleTransactionDetailResponse(
+                transaction.getId() == null ? fallbackId : transaction.getId(),
+                transaction.getTransactionType().getId(),
+                transaction.getTransactionType().getCode(),
+                transaction.getReceiptNumber(),
+                transaction.getStatus() == null ? SaleTransactionStatus.COMPLETED.name() : transaction.getStatus().name(),
+                transaction.getCustomerId(),
+                transaction.getCustomerName(),
+                transaction.getAmount(),
+                transaction.getRefundedAmount(),
+                transaction.getRefundedAt(),
+                transaction.getNotes(),
+                transaction.getOccurredAt(),
+                timeline
+        );
+    }
+
+    private SaleTransactionTimelineEventResponse toTimelineResponse(ActivityLog log) {
+        return new SaleTransactionTimelineEventResponse(
+                log.getId(),
+                log.getAction(),
+                log.getResourceType(),
+                log.getResourceId(),
+                log.getAfterJson(),
+                log.getOccurredAt()
         );
     }
 
