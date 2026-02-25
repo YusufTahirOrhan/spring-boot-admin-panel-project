@@ -31,6 +31,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import java.util.concurrent.ConcurrentHashMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -277,6 +279,43 @@ class AuthIntegrationTest {
                 .andExpect(jsonPath("$.publishedSuccessCount").exists());
     }
 
+
+    @Test
+    void shouldReturnForbiddenForAuditEventsWhenRoleIsStaff() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        mockMvc.perform(get("/api/v1/admin/audit/events")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void shouldReturnAuditEventsForOwnerRole() throws Exception {
+        String ownerToken = jwtTokenService.generateAccessToken("owner", "OWNER");
+
+        com.optimaxx.management.domain.model.ActivityLog log = new com.optimaxx.management.domain.model.ActivityLog();
+        log.setActorUserId(UUID.randomUUID());
+        log.setActorRole("OWNER");
+        log.setAction("LOGIN_SUCCESS");
+        log.setResourceType("AUTH");
+        log.setResourceId("owner");
+        log.setBeforeJson("{}");
+        log.setAfterJson("{}");
+        log.setRequestId("req-1");
+        log.setOccurredAt(Instant.now());
+        log.setDeleted(false);
+
+        when(activityLogRepository.findAll(any(org.springframework.data.jpa.domain.Specification.class), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new PageImpl<>(java.util.List.of(log), PageRequest.of(0, 20), 1));
+
+        mockMvc.perform(get("/api/v1/admin/audit/events")
+                        .header("Authorization", "Bearer " + ownerToken)
+                        .param("eventType", "LOGIN_SUCCESS")
+                        .param("page", "0")
+                        .param("size", "20"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].action").value("LOGIN_SUCCESS"));
+    }
 
     @Test
     void shouldLogoutAllDevicesForAuthenticatedUser() throws Exception {
