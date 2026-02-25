@@ -7,6 +7,7 @@ import java.util.UUID;
 public record SaleTransactionResponse(UUID id,
                                       UUID transactionTypeId,
                                       String transactionTypeCode,
+                                      String receiptNumber,
                                       UUID customerId,
                                       String customerName,
                                       BigDecimal amount,

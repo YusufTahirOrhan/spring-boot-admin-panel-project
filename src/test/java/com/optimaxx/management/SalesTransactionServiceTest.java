@@ -46,6 +46,8 @@ class SalesTransactionServiceTest {
         type.setCategory(TransactionTypeCategory.SALE);
 
         when(typeRepository.findByIdAndDeletedFalse(typeId)).thenReturn(Optional.of(type));
+        when(saleRepository.findTopByStoreIdAndReceiptNumberStartingWithOrderByReceiptNumberDesc(any(UUID.class), any(String.class))).thenReturn(Optional.empty());
+        when(saleRepository.existsByStoreIdAndReceiptNumberAndDeletedFalse(any(UUID.class), any(String.class))).thenReturn(false);
         when(saleRepository.save(any(SaleTransaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         SalesTransactionService service = new SalesTransactionService(
@@ -59,6 +61,7 @@ class SalesTransactionServiceTest {
 
         assertThat(response.transactionTypeCode()).isEqualTo("GLASS_SALE");
         assertThat(response.customerName()).isEqualTo("Yusuf");
+        assertThat(response.receiptNumber()).startsWith("RCP-");
         verify(saleRepository).save(any(SaleTransaction.class));
     }
 
@@ -86,8 +89,9 @@ class SalesTransactionServiceTest {
 
         when(typeRepository.findByIdAndDeletedFalse(typeId)).thenReturn(Optional.of(type));
         when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
+        when(saleRepository.findTopByStoreIdAndReceiptNumberStartingWithOrderByReceiptNumberDesc(any(UUID.class), any(String.class))).thenReturn(Optional.empty());
+        when(saleRepository.existsByStoreIdAndReceiptNumberAndDeletedFalse(any(UUID.class), any(String.class))).thenReturn(false);
         when(saleRepository.save(any(SaleTransaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
         SalesTransactionService service = new SalesTransactionService(
                 saleRepository,
                 typeRepository,
@@ -139,9 +143,10 @@ class SalesTransactionServiceTest {
         type.setCategory(TransactionTypeCategory.SALE);
 
         when(typeRepository.findByIdAndDeletedFalse(typeId)).thenReturn(Optional.of(type));
+        when(saleRepository.findTopByStoreIdAndReceiptNumberStartingWithOrderByReceiptNumberDesc(any(UUID.class), any(String.class))).thenReturn(Optional.empty());
+        when(saleRepository.existsByStoreIdAndReceiptNumberAndDeletedFalse(any(UUID.class), any(String.class))).thenReturn(false);
         when(saleRepository.save(any(SaleTransaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        InventoryItem item = new InventoryItem();
-        item.setSku("SKU-1");
+        InventoryItem item = new InventoryItem();        item.setSku("SKU-1");
         when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), any(String.class), any(String.class), org.mockito.ArgumentMatchers.nullable(UUID.class), any(String.class))).thenReturn(item);
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, auditService, inventoryStockCoordinator);
@@ -196,6 +201,7 @@ class SalesTransactionServiceTest {
         sale.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
         sale.setTransactionType(type);
         sale.setCustomerName("Customer A");
+        sale.setReceiptNumber("RCP-20260225-0001");
         sale.setAmount(new BigDecimal("250.00"));
         sale.setOccurredAt(Instant.now());
 
@@ -203,6 +209,8 @@ class SalesTransactionServiceTest {
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, auditService, inventoryStockCoordinator);
 
-        assertThat(service.list(null)).hasSize(1);
+        assertThat(service.list(null, null)).hasSize(1);
+        assertThat(service.list(null, "20260225")).hasSize(1);
+        assertThat(service.list(null, "missing")).isEmpty();
     }
 }

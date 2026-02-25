@@ -12,7 +12,11 @@ import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
 import com.optimaxx.management.security.audit.AuditEventType;
 import com.optimaxx.management.security.audit.SecurityAuditService;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,6 +87,8 @@ public class SalesTransactionService {
             throw new ResponseStatusException(BAD_REQUEST, "customerName or customerId is required");
         }
 
+        UUID storeId = StoreContext.currentStoreId();
+
         SaleTransaction saleTransaction = new SaleTransaction();
         saleTransaction.setTransactionType(transactionType);
         saleTransaction.setCustomer(customer);
@@ -90,7 +96,8 @@ public class SalesTransactionService {
         saleTransaction.setAmount(request.amount());
         saleTransaction.setNotes(isBlank(request.notes()) ? null : request.notes().trim());
         saleTransaction.setOccurredAt(Instant.now());
-        saleTransaction.setStoreId(StoreContext.currentStoreId());
+        saleTransaction.setStoreId(storeId);
+        saleTransaction.setReceiptNumber(generateReceiptNumber(storeId));
         saleTransaction.setDeleted(false);
 
         SaleTransaction saved = saleTransactionRepository.save(saleTransaction);
@@ -124,14 +131,17 @@ public class SalesTransactionService {
     }
 
     @Transactional(readOnly = true)
-    public List<SaleTransactionResponse> list(Instant from) {
+    public List<SaleTransactionResponse> list(Instant from, String query) {
         List<SaleTransaction> transactions = from == null
                 ? saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()
                 : saleTransactionRepository.findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(from);
 
         var storeId = StoreContext.currentStoreId();
+        String normalizedQuery = trimToNull(query);
+
         return transactions.stream()
                 .filter(transaction -> (transaction.getStoreId() == null || storeId.equals(transaction.getStoreId())))
+                .filter(transaction -> matchesQuery(transaction, normalizedQuery))
                 .map(this::toResponse)
                 .toList();
     }
@@ -141,12 +151,51 @@ public class SalesTransactionService {
                 transaction.getId(),
                 transaction.getTransactionType().getId(),
                 transaction.getTransactionType().getCode(),
+                transaction.getReceiptNumber(),
                 transaction.getCustomerId(),
                 transaction.getCustomerName(),
                 transaction.getAmount(),
                 transaction.getNotes(),
                 transaction.getOccurredAt()
         );
+    }
+
+    private String generateReceiptNumber(UUID storeId) {
+        String datePart = LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE);
+        String prefix = "RCP-" + datePart + "-";
+
+        int nextSequence = saleTransactionRepository
+                .findTopByStoreIdAndReceiptNumberStartingWithOrderByReceiptNumberDesc(storeId, prefix)
+                .map(transaction -> transaction.getReceiptNumber())
+                .map(number -> number.substring(prefix.length()))
+                .map(suffix -> {
+                    try {
+                        return Integer.parseInt(suffix);
+                    } catch (NumberFormatException ex) {
+                        return 0;
+                    }
+                })
+                .orElse(0) + 1;
+
+        for (int i = nextSequence; i < nextSequence + 10; i++) {
+            String candidate = prefix + String.format(Locale.ROOT, "%04d", i);
+            if (!saleTransactionRepository.existsByStoreIdAndReceiptNumberAndDeletedFalse(storeId, candidate)) {
+                return candidate;
+            }
+        }
+
+        throw new ResponseStatusException(BAD_REQUEST, "Could not generate unique receipt number");
+    }
+
+    private boolean matchesQuery(SaleTransaction transaction, String normalizedQuery) {
+        if (normalizedQuery == null) {
+            return true;
+        }
+
+        String q = normalizedQuery.toLowerCase(Locale.ROOT);
+        String customerName = transaction.getCustomerName() == null ? "" : transaction.getCustomerName().toLowerCase(Locale.ROOT);
+        String receiptNumber = transaction.getReceiptNumber() == null ? "" : transaction.getReceiptNumber().toLowerCase(Locale.ROOT);
+        return customerName.contains(q) || receiptNumber.contains(q);
     }
 
     private String trimToNull(String value) {
