@@ -71,7 +71,7 @@ public class LensPrescriptionService {
         prescription.setPd(trimToNull(request.pd()));
         prescription.setNotes(trimToNull(request.notes()));
         prescription.setRecordedAt(Instant.now());
-        prescription.setStoreId(UUID.randomUUID());
+        prescription.setStoreId(StoreContext.currentStoreId());
         prescription.setDeleted(false);
 
         LensPrescription saved = lensPrescriptionRepository.save(prescription);
@@ -89,7 +89,9 @@ public class LensPrescriptionService {
 
     @Transactional(readOnly = true)
     public List<LensPrescriptionResponse> list() {
+        var storeId = StoreContext.currentStoreId();
         return lensPrescriptionRepository.findByDeletedFalseOrderByRecordedAtDesc().stream()
+                .filter(prescription -> (prescription.getStoreId() == null || storeId.equals(prescription.getStoreId())))
                 .map(this::toResponse)
                 .toList();
     }

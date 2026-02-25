@@ -40,7 +40,7 @@ public class CustomerService {
         customer.setPhone(trimToNull(request.phone()));
         customer.setEmail(trimToNull(request.email()));
         customer.setNotes(trimToNull(request.notes()));
-        customer.setStoreId(UUID.randomUUID());
+        customer.setStoreId(StoreContext.currentStoreId());
         customer.setDeleted(false);
 
         Customer saved = customerRepository.save(customer);
@@ -65,7 +65,11 @@ public class CustomerService {
             customers = customerRepository
                     .findByDeletedFalseAndFirstNameContainingIgnoreCaseOrDeletedFalseAndLastNameContainingIgnoreCaseOrderByCreatedAtDesc(normalized, normalized);
         }
-        return customers.stream().map(this::toResponse).toList();
+        var storeId = StoreContext.currentStoreId();
+        return customers.stream()
+                .filter(customer -> (customer.getStoreId() == null || storeId.equals(customer.getStoreId())))
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional

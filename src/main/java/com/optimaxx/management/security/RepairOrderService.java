@@ -74,7 +74,7 @@ public class RepairOrderService {
         order.setDescription(trimToNull(request.description()));
         order.setStatus(RepairStatus.RECEIVED);
         order.setReceivedAt(Instant.now());
-        order.setStoreId(UUID.randomUUID());
+        order.setStoreId(StoreContext.currentStoreId());
         order.setDeleted(false);
         order.setReservedInventoryItemId(request.inventoryItemId());
         order.setReservedInventoryQuantity(request.inventoryQuantity());
@@ -113,7 +113,9 @@ public class RepairOrderService {
 
     @Transactional(readOnly = true)
     public List<RepairOrderResponse> list() {
+        var storeId = StoreContext.currentStoreId();
         return repairOrderRepository.findByDeletedFalseOrderByReceivedAtDesc().stream()
+                .filter(order -> (order.getStoreId() == null || storeId.equals(order.getStoreId())))
                 .map(this::toResponse)
                 .toList();
     }

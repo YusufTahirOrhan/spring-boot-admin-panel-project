@@ -53,7 +53,7 @@ public class InventoryService {
         item.setCategory(trimToNull(request.category()));
         item.setQuantity(request.quantity() == null ? 0 : request.quantity());
         item.setMinQuantity(request.minQuantity() == null ? 0 : request.minQuantity());
-        item.setStoreId(UUID.randomUUID());
+        item.setStoreId(StoreContext.currentStoreId());
         item.setDeleted(false);
 
         InventoryItem saved = inventoryItemRepository.save(item);
@@ -64,7 +64,11 @@ public class InventoryService {
 
     @Transactional(readOnly = true)
     public List<InventoryItemResponse> listItems() {
-        return inventoryItemRepository.findByDeletedFalseOrderByNameAsc().stream().map(this::toResponse).toList();
+        var storeId = StoreContext.currentStoreId();
+        return inventoryItemRepository.findByDeletedFalseOrderByNameAsc().stream()
+                .filter(item -> (item.getStoreId() == null || storeId.equals(item.getStoreId())))
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional
@@ -120,7 +124,7 @@ public class InventoryService {
         movement.setQuantityDelta(delta);
         movement.setReason(trimToNull(request.reason()));
         movement.setMovedAt(Instant.now());
-        movement.setStoreId(UUID.randomUUID());
+        movement.setStoreId(StoreContext.currentStoreId());
         movement.setDeleted(false);
         inventoryMovementRepository.save(movement);
 

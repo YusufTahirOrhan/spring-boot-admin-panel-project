@@ -130,7 +130,7 @@ class LensPrescriptionServiceTest {
         transactionType.setStoreId(UUID.randomUUID());
 
         LensPrescription prescription = new LensPrescription();
-        prescription.setStoreId(UUID.randomUUID());
+        prescription.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
         prescription.setCustomer(customer);
         prescription.setTransactionType(transactionType);
         prescription.setRecordedAt(java.time.Instant.now());
