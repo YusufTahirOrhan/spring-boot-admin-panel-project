@@ -6,6 +6,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.util.UUID;
 import java.math.BigDecimal;
 import java.time.Instant;
 
@@ -16,6 +17,10 @@ public class SaleTransaction extends BaseEntity {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "transaction_type_id", nullable = false)
     private TransactionType transactionType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "customer_id")
+    private Customer customer;
 
     @Column(name = "customer_name", nullable = false, length = 128)
     private String customerName;
@@ -35,6 +40,18 @@ public class SaleTransaction extends BaseEntity {
 
     public void setTransactionType(TransactionType transactionType) {
         this.transactionType = transactionType;
+    }
+
+    public Customer getCustomer() {
+        return customer;
+    }
+
+    public void setCustomer(Customer customer) {
+        this.customer = customer;
+    }
+
+    public UUID getCustomerId() {
+        return customer == null ? null : customer.getId();
     }
 
     public String getCustomerName() {
