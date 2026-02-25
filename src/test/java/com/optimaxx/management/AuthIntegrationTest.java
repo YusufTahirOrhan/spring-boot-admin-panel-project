@@ -156,6 +156,9 @@ class AuthIntegrationTest {
                 .thenReturn(stockItem);
         when(inventoryStockCoordinator.release(any(UUID.class), any(Integer.class), anyString(), anyString(), org.mockito.ArgumentMatchers.nullable(UUID.class), anyString()))
                 .thenReturn(stockItem);
+
+        when(saleTransactionRepository.findTopByStoreIdAndInvoiceNumberStartingWithOrderByInvoiceNumberDesc(any(UUID.class), anyString()))
+                .thenReturn(Optional.empty());
     }
 
     @Test

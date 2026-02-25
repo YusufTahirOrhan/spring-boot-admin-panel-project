@@ -59,6 +59,12 @@ public class SaleTransaction extends BaseEntity {
     @Column(name = "refunded_at")
     private Instant refundedAt;
 
+    @Column(name = "invoice_number", length = 32)
+    private String invoiceNumber;
+
+    @Column(name = "invoice_issued_at")
+    private Instant invoiceIssuedAt;
+
     @Column(name = "notes", length = 500)
     private String notes;
 
@@ -171,6 +177,22 @@ public class SaleTransaction extends BaseEntity {
 
     public void setRefundedAt(Instant refundedAt) {
         this.refundedAt = refundedAt;
+    }
+
+    public String getInvoiceNumber() {
+        return invoiceNumber;
+    }
+
+    public void setInvoiceNumber(String invoiceNumber) {
+        this.invoiceNumber = invoiceNumber;
+    }
+
+    public Instant getInvoiceIssuedAt() {
+        return invoiceIssuedAt;
+    }
+
+    public void setInvoiceIssuedAt(Instant invoiceIssuedAt) {
+        this.invoiceIssuedAt = invoiceIssuedAt;
     }
 
     public String getNotes() {

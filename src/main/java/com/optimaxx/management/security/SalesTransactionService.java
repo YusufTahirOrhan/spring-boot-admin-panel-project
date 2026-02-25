@@ -271,10 +271,19 @@ public class SalesTransactionService {
             throw new ResponseStatusException(NOT_FOUND, "Sale transaction not found");
         }
 
+        if (transaction.getInvoiceNumber() == null) {
+            transaction.setInvoiceNumber(generateInvoiceNumber(storeId));
+            transaction.setInvoiceIssuedAt(Instant.now());
+        }
+
         BigDecimal refunded = transaction.getRefundedAmount() == null ? BigDecimal.ZERO : transaction.getRefundedAmount();
         BigDecimal net = transaction.getAmount().subtract(refunded);
 
-        String text = "INVOICE\n"
+        String text = "OPTIMAXX SALES INVOICE\n"
+                + "Invoice No: " + safe(transaction.getInvoiceNumber()) + "\n"
+                + "Issued At: " + safe(String.valueOf(transaction.getInvoiceIssuedAt())) + "\n"
+                + "Store Id: " + safe(String.valueOf(storeId)) + "\n"
+                + "------------------------------\n"
                 + "Receipt: " + safe(transaction.getReceiptNumber()) + "\n"
                 + "TransactionId: " + transactionId + "\n"
                 + "Customer: " + safe(transaction.getCustomerName()) + "\n"
@@ -457,6 +466,26 @@ public class SalesTransactionService {
                 log.getAfterJson(),
                 log.getOccurredAt()
         );
+    }
+
+    private String generateInvoiceNumber(UUID storeId) {
+        String datePart = LocalDate.now(ZoneOffset.UTC).format(DateTimeFormatter.BASIC_ISO_DATE);
+        String prefix = "INV-" + datePart + "-";
+
+        int nextSequence = saleTransactionRepository
+                .findTopByStoreIdAndInvoiceNumberStartingWithOrderByInvoiceNumberDesc(storeId, prefix)
+                .map(SaleTransaction::getInvoiceNumber)
+                .map(number -> number.substring(prefix.length()))
+                .map(suffix -> {
+                    try {
+                        return Integer.parseInt(suffix);
+                    } catch (NumberFormatException ex) {
+                        return 0;
+                    }
+                })
+                .orElse(0) + 1;
+
+        return prefix + String.format(Locale.ROOT, "%04d", nextSequence);
     }
 
     private String generateReceiptNumber(UUID storeId) {
