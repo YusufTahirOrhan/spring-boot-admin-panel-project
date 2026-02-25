@@ -673,10 +673,13 @@ class AuthIntegrationTest {
 
         mockMvc.perform(get("/api/v1/sales/transactions")
                         .header("Authorization", "Bearer " + staffToken)
-                        .param("q", "20260225"))
+                        .param("q", "20260225")
+                        .param("page", "0")
+                        .param("size", "20")
+                        .param("sort", "occurredAt,desc"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].customerName").value("Yusuf"))
-                .andExpect(jsonPath("$[0].receiptNumber").value("RCP-20260225-0001"));
+                .andExpect(jsonPath("$.content[0].customerName").value("Yusuf"))
+                .andExpect(jsonPath("$.content[0].receiptNumber").value("RCP-20260225-0001"));
     }
 
     @Test

@@ -8,7 +8,7 @@ import com.optimaxx.management.interfaces.rest.dto.SaleTransactionSummaryRespons
 import com.optimaxx.management.interfaces.rest.dto.UpdateSaleTransactionStatusRequest;
 import com.optimaxx.management.security.SalesTransactionService;
 import java.time.Instant;
-import java.util.List;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import java.util.UUID;
@@ -36,11 +36,16 @@ public class SalesTransactionController {
     }
 
     @GetMapping
-    public List<SaleTransactionResponse> list(@RequestParam(value = "from", required = false)
+    public Page<SaleTransactionResponse> list(@RequestParam(value = "from", required = false)
                                               @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+                                              @RequestParam(value = "to", required = false)
+                                              @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
                                               @RequestParam(value = "q", required = false) String query,
-                                              @RequestParam(value = "paymentMethod", required = false) String paymentMethod) {
-        return salesTransactionService.list(from, query, paymentMethod);
+                                              @RequestParam(value = "paymentMethod", required = false) String paymentMethod,
+                                              @RequestParam(value = "page", defaultValue = "0") int page,
+                                              @RequestParam(value = "size", defaultValue = "20") int size,
+                                              @RequestParam(value = "sort", defaultValue = "occurredAt,desc") String sort) {
+        return salesTransactionService.list(from, to, query, paymentMethod, page, size, sort);
     }
 
     @GetMapping("/summary")
