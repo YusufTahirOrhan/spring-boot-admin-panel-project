@@ -732,6 +732,41 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldGetSalesTransactionDetailWithTimelineForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+        UUID transactionId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        type.setCode("GLASS_SALE");
+
+        com.optimaxx.management.domain.model.SaleTransaction tx = new com.optimaxx.management.domain.model.SaleTransaction();
+        tx.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        tx.setTransactionType(type);
+        tx.setStatus(com.optimaxx.management.domain.model.SaleTransactionStatus.COMPLETED);
+        tx.setAmount(new java.math.BigDecimal("120.00"));
+        tx.setOccurredAt(Instant.now());
+
+        com.optimaxx.management.domain.model.ActivityLog log = new com.optimaxx.management.domain.model.ActivityLog();
+        log.setAction("SALE_TRANSACTION_CREATED");
+        log.setResourceType("SALE_TRANSACTION");
+        log.setResourceId(transactionId.toString());
+        log.setAfterJson("{\"amount\":120.00}");
+        log.setOccurredAt(Instant.now());
+
+        when(saleTransactionRepository.findByIdAndDeletedFalse(transactionId)).thenReturn(Optional.of(tx));
+        when(activityLogRepository.findByStoreIdAndResourceTypeAndResourceIdAndDeletedFalseOrderByOccurredAtDesc(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                "SALE_TRANSACTION",
+                transactionId.toString())).thenReturn(java.util.List.of(log));
+
+        mockMvc.perform(get("/api/v1/sales/transactions/{id}", transactionId)
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(transactionId.toString()))
+                .andExpect(jsonPath("$.timeline[0].eventType").value("SALE_TRANSACTION_CREATED"));
+    }
+
+    @Test
     void shouldRejectSalesTransactionForInactiveType() throws Exception {
         String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
 

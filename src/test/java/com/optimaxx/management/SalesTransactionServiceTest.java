@@ -12,6 +12,7 @@ import com.optimaxx.management.domain.model.InventoryItem;
 import com.optimaxx.management.domain.model.SaleTransaction;
 import com.optimaxx.management.domain.model.TransactionType;
 import com.optimaxx.management.domain.model.TransactionTypeCategory;
+import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.domain.repository.CustomerRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
@@ -39,6 +40,7 @@ class SalesTransactionServiceTest {
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
         InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID typeId = UUID.randomUUID();
@@ -57,6 +59,7 @@ class SalesTransactionServiceTest {
                 saleRepository,
                 typeRepository,
                 customerRepository,
+                activityLogRepository,
                 auditService,
                 inventoryStockCoordinator
         );
@@ -75,6 +78,7 @@ class SalesTransactionServiceTest {
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
         InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID typeId = UUID.randomUUID();
@@ -100,6 +104,7 @@ class SalesTransactionServiceTest {
                 saleRepository,
                 typeRepository,
                 customerRepository,
+                activityLogRepository,
                 auditService,
                 inventoryStockCoordinator
         );
@@ -115,6 +120,7 @@ class SalesTransactionServiceTest {
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
         InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID typeId = UUID.randomUUID();
@@ -124,7 +130,7 @@ class SalesTransactionServiceTest {
 
         when(typeRepository.findByIdAndDeletedFalse(typeId)).thenReturn(Optional.of(type));
 
-        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, auditService, inventoryStockCoordinator);
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
 
         assertThatThrownBy(() -> service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("1200.00"), null, null, null)))
                 .isInstanceOf(ResponseStatusException.class);
@@ -136,6 +142,7 @@ class SalesTransactionServiceTest {
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
         InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID typeId = UUID.randomUUID();
@@ -153,7 +160,7 @@ class SalesTransactionServiceTest {
         InventoryItem item = new InventoryItem();        item.setSku("SKU-1");
         when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), any(String.class), any(String.class), org.mockito.ArgumentMatchers.nullable(UUID.class), any(String.class))).thenReturn(item);
 
-        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, auditService, inventoryStockCoordinator);
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
         service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("1500.00"), "progressive lens", itemId, 2));
 
         verify(inventoryStockCoordinator).consume(
@@ -172,6 +179,7 @@ class SalesTransactionServiceTest {
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
         InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID typeId = UUID.randomUUID();
@@ -181,7 +189,7 @@ class SalesTransactionServiceTest {
         type.setCategory(TransactionTypeCategory.SALE);
         when(typeRepository.findByIdAndDeletedFalse(typeId)).thenReturn(Optional.of(type));
 
-        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, auditService, inventoryStockCoordinator);
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
 
         assertThatThrownBy(() -> service.create(new CreateSaleTransactionRequest(typeId, null, "Yusuf", new BigDecimal("100.00"), null, UUID.randomUUID(), null)))
                 .isInstanceOf(ResponseStatusException.class);
@@ -194,6 +202,7 @@ class SalesTransactionServiceTest {
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
         InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID txId = UUID.randomUUID();
@@ -213,7 +222,7 @@ class SalesTransactionServiceTest {
         when(inventoryStockCoordinator.release(any(UUID.class), any(Integer.class), any(String.class), any(String.class), any(UUID.class), any(String.class)))
                 .thenReturn(new InventoryItem());
 
-        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, auditService, inventoryStockCoordinator);
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
         var response = service.updateStatus(txId, new UpdateSaleTransactionStatusRequest(SaleTransactionStatus.CANCELED));
 
         assertThat(response.status()).isEqualTo("CANCELED");
@@ -226,6 +235,7 @@ class SalesTransactionServiceTest {
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
         InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         UUID txId = UUID.randomUUID();
@@ -245,11 +255,51 @@ class SalesTransactionServiceTest {
         when(inventoryStockCoordinator.release(any(UUID.class), any(Integer.class), any(String.class), any(String.class), any(UUID.class), any(String.class)))
                 .thenReturn(new InventoryItem());
 
-        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, auditService, inventoryStockCoordinator);
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
         var response = service.refund(txId, new RefundSaleTransactionRequest(new BigDecimal("100.00"), "return"));
 
         assertThat(response.status()).isEqualTo("REFUNDED");
         assertThat(response.refundedAmount()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void shouldReturnTransactionDetailWithTimeline() {
+        SaleTransactionRepository saleRepository = Mockito.mock(SaleTransactionRepository.class);
+        TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        UUID txId = UUID.randomUUID();
+        TransactionType type = new TransactionType();
+        type.setCode("GLASS_SALE");
+
+        SaleTransaction tx = new SaleTransaction();
+        tx.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        tx.setTransactionType(type);
+        tx.setAmount(new BigDecimal("100.00"));
+        tx.setOccurredAt(Instant.now());
+        tx.setStatus(SaleTransactionStatus.COMPLETED);
+
+        com.optimaxx.management.domain.model.ActivityLog log = new com.optimaxx.management.domain.model.ActivityLog();
+        log.setAction("SALE_TRANSACTION_CREATED");
+        log.setResourceType("SALE_TRANSACTION");
+        log.setResourceId(txId.toString());
+        log.setOccurredAt(Instant.now());
+
+        when(saleRepository.findByIdAndDeletedFalse(txId)).thenReturn(Optional.of(tx));
+        when(activityLogRepository.findByStoreIdAndResourceTypeAndResourceIdAndDeletedFalseOrderByOccurredAtDesc(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                "SALE_TRANSACTION",
+                txId.toString())).thenReturn(List.of(log));
+
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
+        var detail = service.detail(txId);
+
+        assertThat(detail.id()).isEqualTo(txId);
+        assertThat(detail.timeline()).hasSize(1);
+        assertThat(detail.timeline().get(0).eventType()).isEqualTo("SALE_TRANSACTION_CREATED");
     }
 
     @Test
@@ -258,6 +308,7 @@ class SalesTransactionServiceTest {
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
         InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
 
         TransactionType type = new TransactionType();
@@ -275,7 +326,7 @@ class SalesTransactionServiceTest {
 
         when(saleRepository.findByDeletedFalseOrderByOccurredAtDesc()).thenReturn(List.of(sale));
 
-        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, auditService, inventoryStockCoordinator);
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
 
         assertThat(service.list(null, null)).hasSize(1);
         assertThat(service.list(null, "20260225")).hasSize(1);
