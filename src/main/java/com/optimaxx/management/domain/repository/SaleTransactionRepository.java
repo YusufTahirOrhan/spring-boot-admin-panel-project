@@ -23,6 +23,8 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
 
     Optional<SaleTransaction> findTopByStoreIdAndReceiptNumberStartingWithOrderByReceiptNumberDesc(UUID storeId, String prefix);
 
+    Optional<SaleTransaction> findTopByStoreIdAndInvoiceNumberStartingWithOrderByInvoiceNumberDesc(UUID storeId, String prefix);
+
     Optional<SaleTransaction> findByIdAndDeletedFalse(UUID id);
 
     boolean existsByStoreIdAndReceiptNumberAndDeletedFalse(UUID storeId, String receiptNumber);

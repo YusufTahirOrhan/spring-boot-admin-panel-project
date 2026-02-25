@@ -288,6 +288,8 @@ class SalesTransactionServiceTest {
         tx.setOccurredAt(Instant.parse("2026-02-25T10:00:00Z"));
 
         when(saleRepository.findByIdAndDeletedFalse(txId)).thenReturn(Optional.of(tx));
+        when(saleRepository.findTopByStoreIdAndInvoiceNumberStartingWithOrderByInvoiceNumberDesc(any(UUID.class), any(String.class)))
+                .thenReturn(Optional.empty());
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
         byte[] pdf = service.invoicePdf(txId);
