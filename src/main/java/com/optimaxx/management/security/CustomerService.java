@@ -5,13 +5,18 @@ import com.optimaxx.management.domain.repository.CustomerRepository;
 import com.optimaxx.management.domain.repository.LensPrescriptionRepository;
 import com.optimaxx.management.domain.repository.RepairOrderRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
+import com.optimaxx.management.domain.model.RepairStatus;
 import com.optimaxx.management.interfaces.rest.dto.CreateCustomerRequest;
 import com.optimaxx.management.interfaces.rest.dto.CustomerResponse;
+import com.optimaxx.management.interfaces.rest.dto.CustomerSummaryResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateCustomerRequest;
 import com.optimaxx.management.security.audit.AuditEventType;
 import com.optimaxx.management.security.audit.SecurityAuditService;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -113,6 +118,48 @@ public class CustomerService {
 
         securityAuditService.log(AuditEventType.CUSTOMER_UPDATED, null, "CUSTOMER", String.valueOf(customer.getId()), "{\"updated\":true}");
         return toResponse(customer);
+    }
+
+    @Transactional(readOnly = true)
+    public CustomerSummaryResponse getSummary(UUID id) {
+        Customer customer = customerRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Customer not found"));
+
+        long salesCount = saleTransactionRepository.countByCustomerAndDeletedFalse(customer);
+        BigDecimal totalSalesAmount = saleTransactionRepository.sumAmountByCustomer(customer);
+        long repairCount = repairOrderRepository.countByCustomerAndDeletedFalse(customer);
+        long prescriptionCount = lensPrescriptionRepository.countByCustomerAndDeletedFalse(customer);
+
+        Map<String, Long> repairStatusCounts = new LinkedHashMap<>();
+        for (RepairStatus status : RepairStatus.values()) {
+            repairStatusCounts.put(status.name(), repairOrderRepository.countByCustomerAndStatusAndDeletedFalse(customer, status));
+        }
+
+        Instant lastSaleAt = saleTransactionRepository.findTopByCustomerAndDeletedFalseOrderByOccurredAtDesc(customer)
+                .map(tx -> tx.getOccurredAt())
+                .orElse(null);
+
+        Instant lastRepairAt = repairOrderRepository.findTopByCustomerAndDeletedFalseOrderByReceivedAtDesc(customer)
+                .map(repair -> repair.getReceivedAt())
+                .orElse(null);
+
+        Instant lastPrescriptionAt = lensPrescriptionRepository.findTopByCustomerAndDeletedFalseOrderByRecordedAtDesc(customer)
+                .map(prescription -> prescription.getRecordedAt())
+                .orElse(null);
+
+        return new CustomerSummaryResponse(
+                customer.getId(),
+                customer.getFirstName(),
+                customer.getLastName(),
+                salesCount,
+                totalSalesAmount,
+                repairCount,
+                repairStatusCounts,
+                prescriptionCount,
+                lastSaleAt,
+                lastRepairAt,
+                lastPrescriptionAt
+        );
     }
 
     @Transactional

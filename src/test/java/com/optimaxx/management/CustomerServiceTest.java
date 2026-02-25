@@ -15,6 +15,8 @@ import com.optimaxx.management.interfaces.rest.dto.CreateCustomerRequest;
 import com.optimaxx.management.interfaces.rest.dto.UpdateCustomerRequest;
 import com.optimaxx.management.security.CustomerService;
 import com.optimaxx.management.security.audit.SecurityAuditService;
+import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -148,6 +150,58 @@ class CustomerServiceTest {
         assertThatThrownBy(() -> customerService.softDelete(id))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("409 CONFLICT");
+    }
+
+    @Test
+    void shouldReturnCustomerSummary() {
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        SaleTransactionRepository saleTransactionRepository = Mockito.mock(SaleTransactionRepository.class);
+        RepairOrderRepository repairOrderRepository = Mockito.mock(RepairOrderRepository.class);
+        LensPrescriptionRepository lensPrescriptionRepository = Mockito.mock(LensPrescriptionRepository.class);
+        SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+
+        UUID id = UUID.randomUUID();
+        Customer customer = new Customer();
+        customer.setFirstName("Yusuf");
+        customer.setLastName("Orhan");
+
+        when(customerRepository.findByIdAndDeletedFalse(id)).thenReturn(Optional.of(customer));
+        when(saleTransactionRepository.countByCustomerAndDeletedFalse(customer)).thenReturn(2L);
+        when(saleTransactionRepository.sumAmountByCustomer(customer)).thenReturn(new BigDecimal("1234.50"));
+        when(repairOrderRepository.countByCustomerAndDeletedFalse(customer)).thenReturn(1L);
+        when(lensPrescriptionRepository.countByCustomerAndDeletedFalse(customer)).thenReturn(3L);
+
+        var now = Instant.now();
+        var sale = new com.optimaxx.management.domain.model.SaleTransaction();
+        sale.setOccurredAt(now);
+        when(saleTransactionRepository.findTopByCustomerAndDeletedFalseOrderByOccurredAtDesc(customer)).thenReturn(Optional.of(sale));
+
+        var repair = new com.optimaxx.management.domain.model.RepairOrder();
+        repair.setReceivedAt(now.minusSeconds(100));
+        when(repairOrderRepository.findTopByCustomerAndDeletedFalseOrderByReceivedAtDesc(customer)).thenReturn(Optional.of(repair));
+
+        var prescription = new com.optimaxx.management.domain.model.LensPrescription();
+        prescription.setRecordedAt(now.minusSeconds(200));
+        when(lensPrescriptionRepository.findTopByCustomerAndDeletedFalseOrderByRecordedAtDesc(customer)).thenReturn(Optional.of(prescription));
+
+        for (var status : com.optimaxx.management.domain.model.RepairStatus.values()) {
+            when(repairOrderRepository.countByCustomerAndStatusAndDeletedFalse(customer, status)).thenReturn(0L);
+        }
+
+        CustomerService customerService = new CustomerService(
+                customerRepository,
+                saleTransactionRepository,
+                repairOrderRepository,
+                lensPrescriptionRepository,
+                securityAuditService
+        );
+
+        var summary = customerService.getSummary(id);
+
+        assertThat(summary.salesCount()).isEqualTo(2);
+        assertThat(summary.totalSalesAmount()).isEqualByComparingTo("1234.50");
+        assertThat(summary.prescriptionCount()).isEqualTo(3);
+        assertThat(summary.lastSaleAt()).isEqualTo(now);
     }
 
     @Test
