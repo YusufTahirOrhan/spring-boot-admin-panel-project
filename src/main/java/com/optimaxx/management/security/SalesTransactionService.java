@@ -34,6 +34,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -163,33 +164,40 @@ public class SalesTransactionService {
                                               int page,
                                               int size,
                                               String sort) {
-        if (from != null && to != null && from.isAfter(to)) {
-            throw new ResponseStatusException(BAD_REQUEST, "from cannot be after to");
-        }
         if (page < 0 || size <= 0) {
             throw new ResponseStatusException(BAD_REQUEST, "page must be >= 0 and size must be > 0");
         }
 
-        List<SaleTransaction> transactions = from == null
-                ? saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()
-                : saleTransactionRepository.findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(from);
-
-        var storeId = StoreContext.currentStoreId();
-        String normalizedQuery = trimToNull(query);
-        SalePaymentMethod paymentMethodFilter = parsePaymentMethod(paymentMethod);
-
-        List<SaleTransactionResponse> filtered = transactions.stream()
-                .filter(transaction -> (transaction.getStoreId() == null || storeId.equals(transaction.getStoreId())))
-                .filter(transaction -> to == null || !transaction.getOccurredAt().isAfter(to))
-                .filter(transaction -> matchesQuery(transaction, normalizedQuery))
-                .filter(transaction -> paymentMethodFilter == null || transaction.getPaymentMethod() == paymentMethodFilter)
-                .sorted(resolveSort(sort))
+        List<SaleTransactionResponse> filtered = filterTransactions(from, to, query, paymentMethod, sort).stream()
                 .map(this::toResponse)
                 .toList();
 
         int fromIndex = Math.min(page * size, filtered.size());
         int toIndex = Math.min(fromIndex + size, filtered.size());
         return new PageImpl<>(filtered.subList(fromIndex, toIndex), PageRequest.of(page, size), filtered.size());
+    }
+
+    @Transactional(readOnly = true)
+    public String exportCsv(Instant from,
+                            Instant to,
+                            String query,
+                            String paymentMethod,
+                            String sort) {
+        return filterTransactions(from, to, query, paymentMethod, sort).stream()
+                .map(this::toResponse)
+                .map(row -> String.join(",",
+                        csvValue(row.receiptNumber()),
+                        csvValue(String.valueOf(row.occurredAt())),
+                        csvValue(row.customerName()),
+                        csvValue(String.valueOf(row.amount())),
+                        csvValue(String.valueOf(row.refundedAmount() == null ? BigDecimal.ZERO : row.refundedAmount())),
+                        csvValue(String.valueOf(row.amount().subtract(row.refundedAmount() == null ? BigDecimal.ZERO : row.refundedAmount()))),
+                        csvValue(row.paymentMethod()),
+                        csvValue(row.status())
+                ))
+                .collect(Collectors.joining("\n",
+                        "receiptNumber,occurredAt,customerName,amount,refundedAmount,netAmount,paymentMethod,status\n",
+                        "\n"));
     }
 
     @Transactional(readOnly = true)
@@ -447,6 +455,43 @@ public class SalesTransactionService {
         }
 
         throw new ResponseStatusException(BAD_REQUEST, "Could not generate unique receipt number");
+    }
+
+    private List<SaleTransaction> filterTransactions(Instant from,
+                                                     Instant to,
+                                                     String query,
+                                                     String paymentMethod,
+                                                     String sort) {
+        validateRange(from, to);
+
+        List<SaleTransaction> transactions = from == null
+                ? saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()
+                : saleTransactionRepository.findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(from);
+
+        var storeId = StoreContext.currentStoreId();
+        String normalizedQuery = trimToNull(query);
+        SalePaymentMethod paymentMethodFilter = parsePaymentMethod(paymentMethod);
+
+        return transactions.stream()
+                .filter(transaction -> (transaction.getStoreId() == null || storeId.equals(transaction.getStoreId())))
+                .filter(transaction -> to == null || !transaction.getOccurredAt().isAfter(to))
+                .filter(transaction -> matchesQuery(transaction, normalizedQuery))
+                .filter(transaction -> paymentMethodFilter == null || transaction.getPaymentMethod() == paymentMethodFilter)
+                .sorted(resolveSort(sort))
+                .toList();
+    }
+
+    private void validateRange(Instant from, Instant to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ResponseStatusException(BAD_REQUEST, "from cannot be after to");
+        }
+    }
+
+    private String csvValue(String value) {
+        if (value == null) {
+            return "";
+        }
+        return "\"" + value.replace("\"", "\"\"") + "\"";
     }
 
     private boolean matchesQuery(SaleTransaction transaction, String normalizedQuery) {

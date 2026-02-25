@@ -264,6 +264,39 @@ class SalesTransactionServiceTest {
     }
 
     @Test
+    void shouldExportTransactionsAsCsv() {
+        SaleTransactionRepository saleRepository = Mockito.mock(SaleTransactionRepository.class);
+        TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        TransactionType type = new TransactionType();
+        type.setCode("GLASS_SALE");
+
+        SaleTransaction tx = new SaleTransaction();
+        tx.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        tx.setTransactionType(type);
+        tx.setCustomerName("Yusuf");
+        tx.setReceiptNumber("RCP-20260225-0001");
+        tx.setAmount(new BigDecimal("200.00"));
+        tx.setRefundedAmount(new BigDecimal("50.00"));
+        tx.setPaymentMethod(SalePaymentMethod.CARD);
+        tx.setStatus(SaleTransactionStatus.COMPLETED);
+        tx.setOccurredAt(Instant.parse("2026-02-25T10:00:00Z"));
+
+        when(saleRepository.findByDeletedFalseOrderByOccurredAtDesc()).thenReturn(List.of(tx));
+
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
+        String csv = service.exportCsv(null, null, null, null, "occurredAt,desc");
+
+        assertThat(csv).contains("receiptNumber,occurredAt,customerName,amount,refundedAmount,netAmount,paymentMethod,status");
+        assertThat(csv).contains("\"RCP-20260225-0001\"");
+        assertThat(csv).contains("\"150.00\"");
+    }
+
+    @Test
     void shouldReturnSummaryWithPaymentBreakdown() {
         SaleTransactionRepository saleRepository = Mockito.mock(SaleTransactionRepository.class);
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
