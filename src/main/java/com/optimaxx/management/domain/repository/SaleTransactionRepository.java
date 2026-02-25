@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface SaleTransactionRepository extends JpaRepository<SaleTransaction, UUID> {
 
+    boolean existsByCustomerAndDeletedFalse(com.optimaxx.management.domain.model.Customer customer);
+
     List<SaleTransaction> findByDeletedFalseOrderByOccurredAtDesc();
 
     List<SaleTransaction> findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(Instant occurredAt);

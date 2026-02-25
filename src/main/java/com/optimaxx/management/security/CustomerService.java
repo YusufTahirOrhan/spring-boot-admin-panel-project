@@ -2,6 +2,9 @@ package com.optimaxx.management.security;
 
 import com.optimaxx.management.domain.model.Customer;
 import com.optimaxx.management.domain.repository.CustomerRepository;
+import com.optimaxx.management.domain.repository.LensPrescriptionRepository;
+import com.optimaxx.management.domain.repository.RepairOrderRepository;
+import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.interfaces.rest.dto.CreateCustomerRequest;
 import com.optimaxx.management.interfaces.rest.dto.CustomerResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateCustomerRequest;
@@ -15,17 +18,27 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.CONFLICT;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
 public class CustomerService {
 
     private final CustomerRepository customerRepository;
+    private final SaleTransactionRepository saleTransactionRepository;
+    private final RepairOrderRepository repairOrderRepository;
+    private final LensPrescriptionRepository lensPrescriptionRepository;
     private final SecurityAuditService securityAuditService;
 
     public CustomerService(CustomerRepository customerRepository,
+                           SaleTransactionRepository saleTransactionRepository,
+                           RepairOrderRepository repairOrderRepository,
+                           LensPrescriptionRepository lensPrescriptionRepository,
                            SecurityAuditService securityAuditService) {
         this.customerRepository = customerRepository;
+        this.saleTransactionRepository = saleTransactionRepository;
+        this.repairOrderRepository = repairOrderRepository;
+        this.lensPrescriptionRepository = lensPrescriptionRepository;
         this.securityAuditService = securityAuditService;
     }
 
@@ -106,6 +119,14 @@ public class CustomerService {
     public void softDelete(UUID id) {
         Customer customer = customerRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Customer not found"));
+
+        boolean hasSaleLinks = saleTransactionRepository.existsByCustomerAndDeletedFalse(customer);
+        boolean hasRepairLinks = repairOrderRepository.existsByCustomerAndDeletedFalse(customer);
+        boolean hasPrescriptionLinks = lensPrescriptionRepository.existsByCustomerAndDeletedFalse(customer);
+
+        if (hasSaleLinks || hasRepairLinks || hasPrescriptionLinks) {
+            throw new ResponseStatusException(CONFLICT, "Customer has active linked records and cannot be deleted");
+        }
 
         customer.setDeleted(true);
         customer.setDeletedAt(Instant.now());
