@@ -21,6 +21,10 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
 
     Optional<SaleTransaction> findTopByCustomerAndDeletedFalseOrderByOccurredAtDesc(Customer customer);
 
+    Optional<SaleTransaction> findTopByStoreIdAndReceiptNumberStartingWithOrderByReceiptNumberDesc(UUID storeId, String prefix);
+
+    boolean existsByStoreIdAndReceiptNumberAndDeletedFalse(UUID storeId, String receiptNumber);
+
     List<SaleTransaction> findByDeletedFalseOrderByOccurredAtDesc();
 
     List<SaleTransaction> findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(Instant occurredAt);

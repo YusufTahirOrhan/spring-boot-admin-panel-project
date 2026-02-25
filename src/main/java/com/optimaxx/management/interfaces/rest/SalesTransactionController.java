@@ -30,7 +30,8 @@ public class SalesTransactionController {
 
     @GetMapping
     public List<SaleTransactionResponse> list(@RequestParam(value = "from", required = false)
-                                              @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from) {
-        return salesTransactionService.list(from);
+                                              @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+                                              @RequestParam(value = "q", required = false) String query) {
+        return salesTransactionService.list(from, query);
     }
 }

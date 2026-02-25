@@ -640,24 +640,33 @@ class AuthIntegrationTest {
                 {"transactionTypeId":"%s","customerName":"Yusuf","amount":1200.50,"notes":"frame + lens"}
                 """.formatted(transactionTypeId);
 
+        when(saleTransactionRepository.findTopByStoreIdAndReceiptNumberStartingWithOrderByReceiptNumberDesc(any(UUID.class), anyString()))
+                .thenReturn(Optional.empty());
+        when(saleTransactionRepository.existsByStoreIdAndReceiptNumberAndDeletedFalse(any(UUID.class), anyString()))
+                .thenReturn(false);
+
         mockMvc.perform(post("/api/v1/sales/transactions")
                         .header("Authorization", "Bearer " + staffToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(createBody))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.transactionTypeCode").value("GLASS_SALE"));
+                .andExpect(jsonPath("$.transactionTypeCode").value("GLASS_SALE"))
+                .andExpect(jsonPath("$.receiptNumber").isNotEmpty());
 
         com.optimaxx.management.domain.model.SaleTransaction listed = new com.optimaxx.management.domain.model.SaleTransaction();
         listed.setTransactionType(transactionType);
         listed.setCustomerName("Yusuf");
+        listed.setReceiptNumber("RCP-20260225-0001");
         listed.setAmount(new java.math.BigDecimal("1200.50"));
         listed.setOccurredAt(Instant.now());
         when(saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()).thenReturn(java.util.List.of(listed));
 
         mockMvc.perform(get("/api/v1/sales/transactions")
-                        .header("Authorization", "Bearer " + staffToken))
+                        .header("Authorization", "Bearer " + staffToken)
+                        .param("q", "20260225"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].customerName").value("Yusuf"));
+                .andExpect(jsonPath("$[0].customerName").value("Yusuf"))
+                .andExpect(jsonPath("$[0].receiptNumber").value("RCP-20260225-0001"));
     }
 
     @Test

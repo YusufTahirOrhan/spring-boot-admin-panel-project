@@ -28,6 +28,9 @@ public class SaleTransaction extends BaseEntity {
     @Column(name = "amount", nullable = false, precision = 12, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "receipt_number", length = 32)
+    private String receiptNumber;
+
     @Column(name = "notes", length = 500)
     private String notes;
 
@@ -68,6 +71,14 @@ public class SaleTransaction extends BaseEntity {
 
     public void setAmount(BigDecimal amount) {
         this.amount = amount;
+    }
+
+    public String getReceiptNumber() {
+        return receiptNumber;
+    }
+
+    public void setReceiptNumber(String receiptNumber) {
+        this.receiptNumber = receiptNumber;
     }
 
     public String getNotes() {
