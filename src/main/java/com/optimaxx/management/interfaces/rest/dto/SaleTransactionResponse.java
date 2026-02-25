@@ -12,6 +12,8 @@ public record SaleTransactionResponse(UUID id,
                                       UUID customerId,
                                       String customerName,
                                       BigDecimal amount,
+                                      BigDecimal refundedAmount,
+                                      Instant refundedAt,
                                       String notes,
                                       Instant occurredAt) {
 }

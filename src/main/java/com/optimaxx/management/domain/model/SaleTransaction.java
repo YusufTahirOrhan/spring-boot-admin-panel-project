@@ -46,6 +46,12 @@ public class SaleTransaction extends BaseEntity {
     @Column(name = "stock_reverted", nullable = false)
     private boolean stockReverted;
 
+    @Column(name = "refunded_amount", precision = 12, scale = 2)
+    private BigDecimal refundedAmount;
+
+    @Column(name = "refunded_at")
+    private Instant refundedAt;
+
     @Column(name = "notes", length = 500)
     private String notes;
 
@@ -126,6 +132,22 @@ public class SaleTransaction extends BaseEntity {
 
     public void setStockReverted(boolean stockReverted) {
         this.stockReverted = stockReverted;
+    }
+
+    public BigDecimal getRefundedAmount() {
+        return refundedAmount;
+    }
+
+    public void setRefundedAmount(BigDecimal refundedAmount) {
+        this.refundedAmount = refundedAmount;
+    }
+
+    public Instant getRefundedAt() {
+        return refundedAt;
+    }
+
+    public void setRefundedAt(Instant refundedAt) {
+        this.refundedAt = refundedAt;
     }
 
     public String getNotes() {
