@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 
 import com.optimaxx.management.domain.model.Customer;
 import com.optimaxx.management.domain.model.InventoryItem;
+import com.optimaxx.management.domain.model.SalePaymentMethod;
 import com.optimaxx.management.domain.model.SaleTransaction;
 import com.optimaxx.management.domain.model.TransactionType;
 import com.optimaxx.management.domain.model.TransactionTypeCategory;
@@ -260,6 +261,45 @@ class SalesTransactionServiceTest {
 
         assertThat(response.status()).isEqualTo("REFUNDED");
         assertThat(response.refundedAmount()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void shouldReturnSummaryWithPaymentBreakdown() {
+        SaleTransactionRepository saleRepository = Mockito.mock(SaleTransactionRepository.class);
+        TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        TransactionType type = new TransactionType();
+        type.setCode("GLASS_SALE");
+
+        SaleTransaction card = new SaleTransaction();
+        card.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        card.setTransactionType(type);
+        card.setAmount(new BigDecimal("200.00"));
+        card.setRefundedAmount(new BigDecimal("50.00"));
+        card.setPaymentMethod(SalePaymentMethod.CARD);
+        card.setOccurredAt(Instant.now());
+
+        SaleTransaction cash = new SaleTransaction();
+        cash.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        cash.setTransactionType(type);
+        cash.setAmount(new BigDecimal("100.00"));
+        cash.setPaymentMethod(SalePaymentMethod.CASH);
+        cash.setOccurredAt(Instant.now());
+
+        when(saleRepository.findByDeletedFalseOrderByOccurredAtDesc()).thenReturn(List.of(card, cash));
+
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
+        var summary = service.summary(null, null, null);
+
+        assertThat(summary.transactionCount()).isEqualTo(2);
+        assertThat(summary.grossAmount()).isEqualByComparingTo("300.00");
+        assertThat(summary.refundedAmount()).isEqualByComparingTo("50.00");
+        assertThat(summary.netAmount()).isEqualByComparingTo("250.00");
+        assertThat(summary.paymentMethodBreakdown()).hasSize(2);
     }
 
     @Test

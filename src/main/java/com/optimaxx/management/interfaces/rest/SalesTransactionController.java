@@ -4,6 +4,7 @@ import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionDetailResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
+import com.optimaxx.management.interfaces.rest.dto.SaleTransactionSummaryResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateSaleTransactionStatusRequest;
 import com.optimaxx.management.security.SalesTransactionService;
 import java.time.Instant;
@@ -40,6 +41,15 @@ public class SalesTransactionController {
                                               @RequestParam(value = "q", required = false) String query,
                                               @RequestParam(value = "paymentMethod", required = false) String paymentMethod) {
         return salesTransactionService.list(from, query, paymentMethod);
+    }
+
+    @GetMapping("/summary")
+    public SaleTransactionSummaryResponse summary(@RequestParam(value = "from", required = false)
+                                                  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+                                                  @RequestParam(value = "to", required = false)
+                                                  @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+                                                  @RequestParam(value = "paymentMethod", required = false) String paymentMethod) {
+        return salesTransactionService.summary(from, to, paymentMethod);
     }
 
     @GetMapping("/{transactionId}")

@@ -767,6 +767,31 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldReturnSalesTransactionSummaryForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        type.setCode("GLASS_SALE");
+
+        com.optimaxx.management.domain.model.SaleTransaction tx = new com.optimaxx.management.domain.model.SaleTransaction();
+        tx.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        tx.setTransactionType(type);
+        tx.setStatus(com.optimaxx.management.domain.model.SaleTransactionStatus.COMPLETED);
+        tx.setAmount(new java.math.BigDecimal("120.00"));
+        tx.setPaymentMethod(com.optimaxx.management.domain.model.SalePaymentMethod.CARD);
+        tx.setOccurredAt(Instant.now());
+
+        when(saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()).thenReturn(java.util.List.of(tx));
+
+        mockMvc.perform(get("/api/v1/sales/transactions/summary")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.transactionCount").value(1))
+                .andExpect(jsonPath("$.grossAmount").value(120.00))
+                .andExpect(jsonPath("$.paymentMethodBreakdown[0].paymentMethod").value("CARD"));
+    }
+
+    @Test
     void shouldRejectSalesTransactionForInactiveType() throws Exception {
         String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
 
