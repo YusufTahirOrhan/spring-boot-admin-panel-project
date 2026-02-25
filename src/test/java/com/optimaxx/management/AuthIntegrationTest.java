@@ -821,6 +821,33 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldDownloadSalesTransactionInvoicePdfForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+        UUID transactionId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        type.setCode("GLASS_SALE");
+
+        com.optimaxx.management.domain.model.SaleTransaction tx = new com.optimaxx.management.domain.model.SaleTransaction();
+        tx.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
+        tx.setTransactionType(type);
+        tx.setStatus(com.optimaxx.management.domain.model.SaleTransactionStatus.COMPLETED);
+        tx.setCustomerName("Yusuf");
+        tx.setReceiptNumber("RCP-20260225-0001");
+        tx.setAmount(new java.math.BigDecimal("120.00"));
+        tx.setPaymentMethod(com.optimaxx.management.domain.model.SalePaymentMethod.CARD);
+        tx.setOccurredAt(Instant.now());
+
+        when(saleTransactionRepository.findByIdAndDeletedFalse(transactionId)).thenReturn(Optional.of(tx));
+
+        mockMvc.perform(get("/api/v1/sales/transactions/{id}/invoice", transactionId)
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().string("Content-Disposition", org.hamcrest.Matchers.containsString("invoice-" + transactionId)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.content().contentType("application/pdf"));
+    }
+
+    @Test
     void shouldRejectSalesTransactionForInactiveType() throws Exception {
         String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
 
