@@ -20,6 +20,7 @@ import com.optimaxx.management.domain.repository.CustomerRepository;
 import com.optimaxx.management.domain.repository.InventoryItemRepository;
 import com.optimaxx.management.domain.repository.InventoryMovementRepository;
 import com.optimaxx.management.domain.repository.RepairOrderRepository;
+import com.optimaxx.management.domain.repository.LensPrescriptionRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
@@ -93,6 +94,9 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private RepairOrderRepository repairOrderRepository;
+
+    @MockitoBean
+    private LensPrescriptionRepository lensPrescriptionRepository;
 
     @MockitoBean
     private InventoryItemRepository inventoryItemRepository;
@@ -867,6 +871,49 @@ class AuthIntegrationTest {
                         .content("{\"movementType\":\"OUT\",\"quantity\":3,\"reason\":\"sale\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.quantity").value(7));
+    }
+
+    @Test
+    void shouldCreateAndListPrescriptionsForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+
+        UUID customerId = UUID.randomUUID();
+        UUID transactionTypeId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.Customer customer = new com.optimaxx.management.domain.model.Customer();
+        customer.setStoreId(UUID.randomUUID());
+
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        type.setStoreId(UUID.randomUUID());
+        type.setActive(true);
+        type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.PRESCRIPTION);
+
+        com.optimaxx.management.domain.model.LensPrescription saved = new com.optimaxx.management.domain.model.LensPrescription();
+        saved.setStoreId(UUID.randomUUID());
+        saved.setCustomer(customer);
+        saved.setTransactionType(type);
+        saved.setRightSphere("-1.25");
+        saved.setRecordedAt(Instant.now());
+
+        when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
+        when(transactionTypeRepository.findByIdAndDeletedFalse(transactionTypeId)).thenReturn(Optional.of(type));
+        when(lensPrescriptionRepository.save(any(com.optimaxx.management.domain.model.LensPrescription.class))).thenReturn(saved);
+
+        mockMvc.perform(post("/api/v1/sales/prescriptions")
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"customerId":"%s","transactionTypeId":"%s","rightSphere":"-1.25"}
+                                """.formatted(customerId, transactionTypeId)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.rightSphere").value("-1.25"));
+
+        when(lensPrescriptionRepository.findByDeletedFalseOrderByRecordedAtDesc()).thenReturn(java.util.List.of(saved));
+
+        mockMvc.perform(get("/api/v1/sales/prescriptions")
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].rightSphere").value("-1.25"));
     }
 
     private String extractRefreshToken(String json) {
