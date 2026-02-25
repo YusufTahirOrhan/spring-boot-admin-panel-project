@@ -2,6 +2,7 @@ package com.optimaxx.management.security;
 
 import com.optimaxx.management.domain.model.Customer;
 import com.optimaxx.management.domain.model.SaleTransaction;
+import com.optimaxx.management.domain.model.SaleTransactionStatus;
 import com.optimaxx.management.domain.model.TransactionType;
 import com.optimaxx.management.domain.model.TransactionTypeCategory;
 import com.optimaxx.management.domain.repository.CustomerRepository;
@@ -9,6 +10,7 @@ import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
+import com.optimaxx.management.interfaces.rest.dto.UpdateSaleTransactionStatusRequest;
 import com.optimaxx.management.security.audit.AuditEventType;
 import com.optimaxx.management.security.audit.SecurityAuditService;
 import java.time.Instant;
@@ -98,6 +100,10 @@ public class SalesTransactionService {
         saleTransaction.setOccurredAt(Instant.now());
         saleTransaction.setStoreId(storeId);
         saleTransaction.setReceiptNumber(generateReceiptNumber(storeId));
+        saleTransaction.setStatus(SaleTransactionStatus.COMPLETED);
+        saleTransaction.setInventoryItemId(request.inventoryItemId());
+        saleTransaction.setInventoryQuantity(request.inventoryQuantity());
+        saleTransaction.setStockReverted(false);
         saleTransaction.setDeleted(false);
 
         SaleTransaction saved = saleTransactionRepository.save(saleTransaction);
@@ -146,12 +152,60 @@ public class SalesTransactionService {
                 .toList();
     }
 
+    @Transactional
+    public SaleTransactionResponse updateStatus(UUID transactionId, UpdateSaleTransactionStatusRequest request) {
+        if (request == null || request.status() == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "status is required");
+        }
+
+        SaleTransaction transaction = saleTransactionRepository.findByIdAndDeletedFalse(transactionId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Sale transaction not found"));
+
+        if (transaction.getStatus() == SaleTransactionStatus.CANCELED) {
+            if (request.status() == SaleTransactionStatus.CANCELED) {
+                return toResponse(transaction);
+            }
+            throw new ResponseStatusException(BAD_REQUEST, "Canceled sale transaction cannot change status");
+        }
+
+        if (request.status() == SaleTransactionStatus.CANCELED) {
+            if (transaction.getInventoryItemId() != null && transaction.getInventoryQuantity() != null && !transaction.isStockReverted()) {
+                inventoryStockCoordinator.release(
+                        transaction.getInventoryItemId(),
+                        transaction.getInventoryQuantity(),
+                        "SALE cancel rollback " + transaction.getId(),
+                        "SALE_TRANSACTION_CANCEL",
+                        transaction.getId(),
+                        "sale:" + transaction.getId() + ":cancel-rollback"
+                );
+                transaction.setStockReverted(true);
+            }
+
+            transaction.setStatus(SaleTransactionStatus.CANCELED);
+            securityAuditService.log(
+                    AuditEventType.SALE_TRANSACTION_CANCELED,
+                    null,
+                    "SALE_TRANSACTION",
+                    String.valueOf(transaction.getId()),
+                    "{\"status\":\"CANCELED\"}"
+            );
+            return toResponse(transaction);
+        }
+
+        if (request.status() != SaleTransactionStatus.COMPLETED) {
+            throw new ResponseStatusException(BAD_REQUEST, "Unsupported status transition");
+        }
+
+        return toResponse(transaction);
+    }
+
     private SaleTransactionResponse toResponse(SaleTransaction transaction) {
         return new SaleTransactionResponse(
                 transaction.getId(),
                 transaction.getTransactionType().getId(),
                 transaction.getTransactionType().getCode(),
                 transaction.getReceiptNumber(),
+                transaction.getStatus() == null ? SaleTransactionStatus.COMPLETED.name() : transaction.getStatus().name(),
                 transaction.getCustomerId(),
                 transaction.getCustomerName(),
                 transaction.getAmount(),
