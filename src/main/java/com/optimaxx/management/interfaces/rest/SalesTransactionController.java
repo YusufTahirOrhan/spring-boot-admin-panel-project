@@ -10,6 +10,9 @@ import com.optimaxx.management.security.SalesTransactionService;
 import java.time.Instant;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -55,6 +58,20 @@ public class SalesTransactionController {
                                                   @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
                                                   @RequestParam(value = "paymentMethod", required = false) String paymentMethod) {
         return salesTransactionService.summary(from, to, paymentMethod);
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<String> exportCsv(@RequestParam(value = "from", required = false)
+                                            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant from,
+                                            @RequestParam(value = "to", required = false)
+                                            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
+                                            @RequestParam(value = "q", required = false) String query,
+                                            @RequestParam(value = "paymentMethod", required = false) String paymentMethod,
+                                            @RequestParam(value = "sort", defaultValue = "occurredAt,desc") String sort) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=sales-transactions.csv")
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .body(salesTransactionService.exportCsv(from, to, query, paymentMethod, sort));
     }
 
     @GetMapping("/{transactionId}")
