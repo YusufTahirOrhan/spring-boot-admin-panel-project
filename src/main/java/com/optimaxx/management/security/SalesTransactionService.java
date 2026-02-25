@@ -13,8 +13,10 @@ import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
+import com.optimaxx.management.interfaces.rest.dto.SalePaymentMethodSummaryResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionDetailResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
+import com.optimaxx.management.interfaces.rest.dto.SaleTransactionSummaryResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionTimelineEventResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateSaleTransactionStatusRequest;
 import com.optimaxx.management.security.audit.AuditEventType;
@@ -26,6 +28,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -164,6 +167,66 @@ public class SalesTransactionService {
                 .filter(transaction -> paymentMethodFilter == null || transaction.getPaymentMethod() == paymentMethodFilter)
                 .map(this::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public SaleTransactionSummaryResponse summary(Instant from, Instant to, String paymentMethod) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ResponseStatusException(BAD_REQUEST, "from cannot be after to");
+        }
+
+        UUID storeId = StoreContext.currentStoreId();
+        SalePaymentMethod paymentMethodFilter = parsePaymentMethod(paymentMethod);
+
+        List<SaleTransaction> allTransactions = from == null
+                ? saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()
+                : saleTransactionRepository.findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(from);
+
+        List<SaleTransaction> filtered = allTransactions.stream()
+                .filter(transaction -> transaction.getStoreId() == null || storeId.equals(transaction.getStoreId()))
+                .filter(transaction -> to == null || !transaction.getOccurredAt().isAfter(to))
+                .filter(transaction -> paymentMethodFilter == null || transaction.getPaymentMethod() == paymentMethodFilter)
+                .toList();
+
+        BigDecimal grossAmount = filtered.stream()
+                .map(SaleTransaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal refundedAmount = filtered.stream()
+                .map(transaction -> transaction.getRefundedAmount() == null ? BigDecimal.ZERO : transaction.getRefundedAmount())
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        List<SalePaymentMethodSummaryResponse> breakdown = filtered.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        transaction -> transaction.getPaymentMethod() == null ? SalePaymentMethod.CASH : transaction.getPaymentMethod()
+                ))
+                .entrySet()
+                .stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(entry -> {
+                    BigDecimal gross = entry.getValue().stream()
+                            .map(SaleTransaction::getAmount)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    BigDecimal refunded = entry.getValue().stream()
+                            .map(transaction -> transaction.getRefundedAmount() == null ? BigDecimal.ZERO : transaction.getRefundedAmount())
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                    return new SalePaymentMethodSummaryResponse(
+                            entry.getKey().name(),
+                            entry.getValue().size(),
+                            gross,
+                            refunded,
+                            gross.subtract(refunded)
+                    );
+                })
+                .toList();
+
+        return new SaleTransactionSummaryResponse(
+                filtered.size(),
+                grossAmount,
+                refundedAmount,
+                grossAmount.subtract(refundedAmount),
+                breakdown
+        );
     }
 
     @Transactional(readOnly = true)
