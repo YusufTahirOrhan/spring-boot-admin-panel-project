@@ -74,6 +74,14 @@ public class SalesTransactionController {
                 .body(salesTransactionService.exportCsv(from, to, query, paymentMethod, sort));
     }
 
+    @GetMapping("/{transactionId}/invoice")
+    public ResponseEntity<byte[]> invoice(@PathVariable UUID transactionId) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=invoice-" + transactionId + ".pdf")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(salesTransactionService.invoicePdf(transactionId));
+    }
+
     @GetMapping("/{transactionId}")
     public SaleTransactionDetailResponse detail(@PathVariable UUID transactionId) {
         return salesTransactionService.detail(transactionId);
