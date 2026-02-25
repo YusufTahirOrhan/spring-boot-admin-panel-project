@@ -57,7 +57,7 @@ public class UserManagementService {
         owner.setRole(UserRole.OWNER);
         owner.setActive(true);
         owner.setDeleted(false);
-        owner.setStoreId(UUID.randomUUID());
+        owner.setStoreId(StoreContext.currentStoreId());
 
         userRepository.save(owner);
         securityAuditService.log(AuditEventType.USER_CREATED, owner, "USER", owner.getUsername(), "{\"source\":\"bootstrap\"}");
@@ -87,7 +87,7 @@ public class UserManagementService {
         user.setRole(request.role() == null ? UserRole.STAFF : request.role());
         user.setActive(request.active() == null || request.active());
         user.setDeleted(false);
-        user.setStoreId(UUID.randomUUID());
+        user.setStoreId(StoreContext.currentStoreId());
 
         User saved = userRepository.save(user);
         securityAuditService.log(AuditEventType.USER_CREATED, saved, "USER", saved.getUsername(), "{\"source\":\"admin\"}");

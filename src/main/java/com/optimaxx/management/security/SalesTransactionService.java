@@ -66,7 +66,7 @@ public class SalesTransactionService {
         saleTransaction.setAmount(request.amount());
         saleTransaction.setNotes(isBlank(request.notes()) ? null : request.notes().trim());
         saleTransaction.setOccurredAt(Instant.now());
-        saleTransaction.setStoreId(UUID.randomUUID());
+        saleTransaction.setStoreId(StoreContext.currentStoreId());
         saleTransaction.setDeleted(false);
 
         SaleTransaction saved = saleTransactionRepository.save(saleTransaction);
@@ -105,7 +105,11 @@ public class SalesTransactionService {
                 ? saleTransactionRepository.findByDeletedFalseOrderByOccurredAtDesc()
                 : saleTransactionRepository.findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(from);
 
-        return transactions.stream().map(this::toResponse).toList();
+        var storeId = StoreContext.currentStoreId();
+        return transactions.stream()
+                .filter(transaction -> (transaction.getStoreId() == null || storeId.equals(transaction.getStoreId())))
+                .map(this::toResponse)
+                .toList();
     }
 
     private SaleTransactionResponse toResponse(SaleTransaction transaction) {

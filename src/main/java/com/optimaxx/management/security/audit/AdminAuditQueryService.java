@@ -3,6 +3,7 @@ package com.optimaxx.management.security.audit;
 import com.optimaxx.management.domain.model.ActivityLog;
 import com.optimaxx.management.domain.repository.ActivityLogRepository;
 import com.optimaxx.management.interfaces.rest.dto.ActivityLogEventResponse;
+import com.optimaxx.management.security.StoreContext;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -32,7 +33,8 @@ public class AdminAuditQueryService {
                                                 int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "occurredAt"));
 
-        Specification<ActivityLog> spec = Specification.where((root, query, cb) -> cb.isFalse(root.get("deleted")));
+        Specification<ActivityLog> spec = Specification.<ActivityLog>where((root, query, cb) -> cb.isFalse(root.get("deleted")))
+                .and((root, query, cb) -> cb.equal(root.get("storeId"), StoreContext.currentStoreId()));
 
         if (actorUserId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("actorUserId"), actorUserId));

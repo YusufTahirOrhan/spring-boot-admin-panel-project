@@ -321,7 +321,7 @@ public class AuthService {
 
     private AuthLoginResponse issueTokenPair(User user, String deviceId, String userAgent, String ipAddress) {
         String role = user.getRole().name();
-        String accessToken = jwtTokenService.generateAccessToken(user.getUsername(), role);
+        String accessToken = jwtTokenService.generateAccessToken(user.getUsername(), role, user.getStoreId());
         String refreshToken = generateOpaqueToken();
 
         RefreshToken refreshTokenEntity = new RefreshToken();

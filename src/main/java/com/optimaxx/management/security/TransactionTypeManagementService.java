@@ -55,7 +55,7 @@ public class TransactionTypeManagementService {
         transactionType.setSortOrder(request.sortOrder() == null ? 0 : request.sortOrder());
         transactionType.setCategory(category);
         transactionType.setMetadataJson(metadataJson);
-        transactionType.setStoreId(UUID.randomUUID());
+        transactionType.setStoreId(StoreContext.currentStoreId());
         transactionType.setDeleted(false);
 
         TransactionType saved = transactionTypeRepository.save(transactionType);
@@ -65,14 +65,18 @@ public class TransactionTypeManagementService {
 
     @Transactional(readOnly = true)
     public List<TransactionTypeResponse> listAdmin() {
+        var storeId = StoreContext.currentStoreId();
         return transactionTypeRepository.findByDeletedFalseOrderBySortOrderAscNameAsc().stream()
+                .filter(type -> (type.getStoreId() == null || storeId.equals(type.getStoreId())))
                 .map(this::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<TransactionTypeResponse> listSales() {
+        var storeId = StoreContext.currentStoreId();
         return transactionTypeRepository.findByActiveTrueAndDeletedFalseOrderBySortOrderAscNameAsc().stream()
+                .filter(type -> (type.getStoreId() == null || storeId.equals(type.getStoreId())))
                 .map(this::toResponse)
                 .toList();
     }

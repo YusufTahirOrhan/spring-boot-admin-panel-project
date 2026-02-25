@@ -7,7 +7,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
 
@@ -21,13 +23,23 @@ public class JwtTokenService {
     }
 
     public String generateAccessToken(String username, String role) {
+        return generateAccessToken(username, role, null);
+    }
+
+    public String generateAccessToken(String username, String role, UUID storeId) {
         Instant now = Instant.now();
         Instant expiry = now.plus(jwtProperties.accessTokenMinutes(), ChronoUnit.MINUTES);
+
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("role", role);
+        if (storeId != null) {
+            claims.put("storeId", storeId.toString());
+        }
 
         return Jwts.builder()
                 .issuer(jwtProperties.issuer())
                 .subject(username)
-                .claims(Map.of("role", role))
+                .claims(claims)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expiry))
                 .signWith(signingKey())

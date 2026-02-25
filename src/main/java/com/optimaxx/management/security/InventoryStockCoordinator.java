@@ -59,7 +59,7 @@ public class InventoryStockCoordinator {
         movement.setSourceType(sourceType);
         movement.setSourceId(sourceId);
         movement.setIdempotencyKey(idempotencyKey);
-        movement.setStoreId(UUID.randomUUID());
+        movement.setStoreId(StoreContext.currentStoreId());
         movement.setDeleted(false);
         inventoryMovementRepository.save(movement);
 
@@ -97,7 +97,7 @@ public class InventoryStockCoordinator {
         movement.setSourceType(sourceType);
         movement.setSourceId(sourceId);
         movement.setIdempotencyKey(idempotencyKey);
-        movement.setStoreId(UUID.randomUUID());
+        movement.setStoreId(StoreContext.currentStoreId());
         movement.setDeleted(false);
         inventoryMovementRepository.save(movement);
 

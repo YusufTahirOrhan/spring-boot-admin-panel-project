@@ -40,7 +40,9 @@ public class SecurityAuditService {
         activityLog.setIpAddress(resolveIpAddress(request));
         activityLog.setUserAgent(resolveUserAgent(request));
         activityLog.setOccurredAt(Instant.now());
-        activityLog.setStoreId(actorUser == null || actorUser.getStoreId() == null ? UUID.randomUUID() : actorUser.getStoreId());
+        activityLog.setStoreId(actorUser == null || actorUser.getStoreId() == null
+                ? com.optimaxx.management.security.StoreContext.currentStoreId()
+                : actorUser.getStoreId());
         activityLog.setDeleted(false);
 
         ActivityLog saved = activityLogRepository.save(activityLog);

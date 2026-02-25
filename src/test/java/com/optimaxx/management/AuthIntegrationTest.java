@@ -928,7 +928,7 @@ class AuthIntegrationTest {
         type.setCategory(com.optimaxx.management.domain.model.TransactionTypeCategory.PRESCRIPTION);
 
         com.optimaxx.management.domain.model.LensPrescription saved = new com.optimaxx.management.domain.model.LensPrescription();
-        saved.setStoreId(UUID.randomUUID());
+        saved.setStoreId(UUID.fromString("00000000-0000-0000-0000-000000000001"));
         saved.setCustomer(customer);
         saved.setTransactionType(type);
         saved.setRightSphere("-1.25");

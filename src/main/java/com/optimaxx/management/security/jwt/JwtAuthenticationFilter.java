@@ -36,6 +36,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtTokenService.parseClaims(token);
                 String username = claims.getSubject();
                 String role = claims.get("role", String.class);
+                String storeId = claims.get("storeId", String.class);
 
                 if (StringUtils.hasText(username) && StringUtils.hasText(role)) {
                     UsernamePasswordAuthenticationToken authenticationToken =
@@ -43,6 +44,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     username,
                                     null,
                                     List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                    if (StringUtils.hasText(storeId)) {
+                        authenticationToken.setDetails(storeId);
+                    }
                     SecurityContextHolder.getContext().setAuthentication(authenticationToken);
                 }
             } catch (JwtException ex) {
