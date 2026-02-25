@@ -824,6 +824,27 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldVerifyReceiptWithoutAuth() throws Exception {
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        type.setCode("GLASS_SALE");
+
+        com.optimaxx.management.domain.model.SaleTransaction tx = new com.optimaxx.management.domain.model.SaleTransaction();
+        tx.setTransactionType(type);
+        tx.setReceiptNumber("RCP-20260225-0001");
+        tx.setAmount(new java.math.BigDecimal("120.00"));
+        tx.setOccurredAt(Instant.now());
+        tx.setStatus(com.optimaxx.management.domain.model.SaleTransactionStatus.COMPLETED);
+
+        when(saleTransactionRepository.findByReceiptNumberAndDeletedFalse("RCP-20260225-0001")).thenReturn(Optional.of(tx));
+
+        mockMvc.perform(get("/api/v1/sales/transactions/verify")
+                        .param("receiptNumber", "RCP-20260225-0001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.valid").value(true))
+                .andExpect(jsonPath("$.receiptNumber").value("RCP-20260225-0001"));
+    }
+
+    @Test
     void shouldDownloadSalesTransactionInvoicePdfForStaffRole() throws Exception {
         String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
         UUID transactionId = UUID.randomUUID();

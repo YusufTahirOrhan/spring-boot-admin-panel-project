@@ -264,6 +264,31 @@ class SalesTransactionServiceTest {
     }
 
     @Test
+    void shouldVerifyReceiptAsValid() {
+        SaleTransactionRepository saleRepository = Mockito.mock(SaleTransactionRepository.class);
+        TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        SaleTransaction tx = new SaleTransaction();
+        tx.setReceiptNumber("RCP-20260225-0001");
+        tx.setInvoiceNumber("INV-20260225-0001");
+        tx.setAmount(new BigDecimal("200.00"));
+        tx.setStatus(SaleTransactionStatus.COMPLETED);
+        tx.setOccurredAt(Instant.now());
+
+        when(saleRepository.findByReceiptNumberAndDeletedFalse("RCP-20260225-0001")).thenReturn(Optional.of(tx));
+
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
+        var response = service.verifyReceipt("RCP-20260225-0001");
+
+        assertThat(response.valid()).isTrue();
+        assertThat(response.invoiceNumber()).isEqualTo("INV-20260225-0001");
+    }
+
+    @Test
     void shouldGenerateInvoicePdf() {
         SaleTransactionRepository saleRepository = Mockito.mock(SaleTransactionRepository.class);
         TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);

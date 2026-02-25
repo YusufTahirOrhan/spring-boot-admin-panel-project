@@ -27,6 +27,8 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
 
     Optional<SaleTransaction> findByIdAndDeletedFalse(UUID id);
 
+    Optional<SaleTransaction> findByReceiptNumberAndDeletedFalse(String receiptNumber);
+
     boolean existsByStoreIdAndReceiptNumberAndDeletedFalse(UUID storeId, String receiptNumber);
 
     List<SaleTransaction> findByDeletedFalseOrderByOccurredAtDesc();
