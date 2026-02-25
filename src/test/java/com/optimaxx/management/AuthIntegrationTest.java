@@ -719,6 +719,35 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldGetSalesCustomerSummaryForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+        UUID customerId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.Customer customer = new com.optimaxx.management.domain.model.Customer();
+        customer.setFirstName("Yusuf");
+        customer.setLastName("Orhan");
+
+        when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
+        when(saleTransactionRepository.countByCustomerAndDeletedFalse(customer)).thenReturn(2L);
+        when(saleTransactionRepository.sumAmountByCustomer(customer)).thenReturn(new java.math.BigDecimal("500.00"));
+        when(repairOrderRepository.countByCustomerAndDeletedFalse(customer)).thenReturn(1L);
+        when(lensPrescriptionRepository.countByCustomerAndDeletedFalse(customer)).thenReturn(1L);
+        when(saleTransactionRepository.findTopByCustomerAndDeletedFalseOrderByOccurredAtDesc(customer)).thenReturn(Optional.empty());
+        when(repairOrderRepository.findTopByCustomerAndDeletedFalseOrderByReceivedAtDesc(customer)).thenReturn(Optional.empty());
+        when(lensPrescriptionRepository.findTopByCustomerAndDeletedFalseOrderByRecordedAtDesc(customer)).thenReturn(Optional.empty());
+
+        for (var status : com.optimaxx.management.domain.model.RepairStatus.values()) {
+            when(repairOrderRepository.countByCustomerAndStatusAndDeletedFalse(customer, status)).thenReturn(0L);
+        }
+
+        mockMvc.perform(get("/api/v1/sales/customers/{id}/summary", customerId)
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.salesCount").value(2))
+                .andExpect(jsonPath("$.totalSalesAmount").value(500.00));
+    }
+
+    @Test
     void shouldCreateAndListSalesCustomersForStaffRole() throws Exception {
         String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
 

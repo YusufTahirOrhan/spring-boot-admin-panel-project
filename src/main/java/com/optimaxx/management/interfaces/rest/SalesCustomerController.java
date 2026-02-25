@@ -2,6 +2,7 @@ package com.optimaxx.management.interfaces.rest;
 
 import com.optimaxx.management.interfaces.rest.dto.CreateCustomerRequest;
 import com.optimaxx.management.interfaces.rest.dto.CustomerResponse;
+import com.optimaxx.management.interfaces.rest.dto.CustomerSummaryResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateCustomerRequest;
 import com.optimaxx.management.security.CustomerService;
 import java.util.List;
@@ -42,6 +43,11 @@ public class SalesCustomerController {
     @GetMapping("/{customerId}")
     public CustomerResponse get(@PathVariable UUID customerId) {
         return customerService.get(customerId);
+    }
+
+    @GetMapping("/{customerId}/summary")
+    public CustomerSummaryResponse summary(@PathVariable UUID customerId) {
+        return customerService.getSummary(customerId);
     }
 
     @PatchMapping("/{customerId}")
