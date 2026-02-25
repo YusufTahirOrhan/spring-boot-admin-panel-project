@@ -7,6 +7,7 @@ import com.optimaxx.management.interfaces.rest.dto.CustomerResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateCustomerRequest;
 import com.optimaxx.management.security.audit.AuditEventType;
 import com.optimaxx.management.security.audit.SecurityAuditService;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -99,6 +100,23 @@ public class CustomerService {
 
         securityAuditService.log(AuditEventType.CUSTOMER_UPDATED, null, "CUSTOMER", String.valueOf(customer.getId()), "{\"updated\":true}");
         return toResponse(customer);
+    }
+
+    @Transactional
+    public void softDelete(UUID id) {
+        Customer customer = customerRepository.findByIdAndDeletedFalse(id)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Customer not found"));
+
+        customer.setDeleted(true);
+        customer.setDeletedAt(Instant.now());
+
+        securityAuditService.log(
+                AuditEventType.CUSTOMER_DELETED,
+                null,
+                "CUSTOMER",
+                String.valueOf(customer.getId()),
+                "{\"deleted\":true}"
+        );
     }
 
     private CustomerResponse toResponse(Customer customer) {

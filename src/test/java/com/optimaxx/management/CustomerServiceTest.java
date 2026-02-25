@@ -63,6 +63,24 @@ class CustomerServiceTest {
     }
 
     @Test
+    void shouldSoftDeleteCustomer() {
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
+
+        UUID id = UUID.randomUUID();
+        Customer customer = new Customer();
+        customer.setDeleted(false);
+
+        when(customerRepository.findByIdAndDeletedFalse(id)).thenReturn(Optional.of(customer));
+
+        CustomerService customerService = new CustomerService(customerRepository, securityAuditService);
+        customerService.softDelete(id);
+
+        assertThat(customer.isDeleted()).isTrue();
+        assertThat(customer.getDeletedAt()).isNotNull();
+    }
+
+    @Test
     void shouldUpdateCustomer() {
         CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
         SecurityAuditService securityAuditService = Mockito.mock(SecurityAuditService.class);
