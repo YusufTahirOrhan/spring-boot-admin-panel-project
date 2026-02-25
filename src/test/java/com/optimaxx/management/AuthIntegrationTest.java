@@ -693,10 +693,29 @@ class AuthIntegrationTest {
         customer.setDeleted(false);
 
         when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
+        when(saleTransactionRepository.existsByCustomerAndDeletedFalse(customer)).thenReturn(false);
+        when(repairOrderRepository.existsByCustomerAndDeletedFalse(customer)).thenReturn(false);
+        when(lensPrescriptionRepository.existsByCustomerAndDeletedFalse(customer)).thenReturn(false);
 
         mockMvc.perform(delete("/api/v1/sales/customers/{id}", customerId)
                         .header("Authorization", "Bearer " + staffToken))
                 .andExpect(status().isNoContent());
+    }
+
+    @Test
+    void shouldRejectDeleteSalesCustomerWhenLinkedRecordsExist() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+        UUID customerId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.Customer customer = new com.optimaxx.management.domain.model.Customer();
+        customer.setDeleted(false);
+
+        when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
+        when(saleTransactionRepository.existsByCustomerAndDeletedFalse(customer)).thenReturn(true);
+
+        mockMvc.perform(delete("/api/v1/sales/customers/{id}", customerId)
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isConflict());
     }
 
     @Test

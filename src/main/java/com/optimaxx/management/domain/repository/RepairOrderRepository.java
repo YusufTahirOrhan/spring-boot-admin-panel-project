@@ -8,6 +8,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> {
 
+    boolean existsByCustomerAndDeletedFalse(com.optimaxx.management.domain.model.Customer customer);
+
     Optional<RepairOrder> findByIdAndDeletedFalse(UUID id);
 
     List<RepairOrder> findByDeletedFalseOrderByReceivedAtDesc();
