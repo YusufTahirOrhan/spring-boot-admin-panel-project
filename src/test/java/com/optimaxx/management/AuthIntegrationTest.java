@@ -685,6 +685,21 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldDeleteSalesCustomerForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+        UUID customerId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.Customer customer = new com.optimaxx.management.domain.model.Customer();
+        customer.setDeleted(false);
+
+        when(customerRepository.findByIdAndDeletedFalse(customerId)).thenReturn(Optional.of(customer));
+
+        mockMvc.perform(delete("/api/v1/sales/customers/{id}", customerId)
+                        .header("Authorization", "Bearer " + staffToken))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
     void shouldCreateAndListSalesCustomersForStaffRole() throws Exception {
         String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
 
