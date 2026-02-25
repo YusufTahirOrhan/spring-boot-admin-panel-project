@@ -1,6 +1,7 @@
 package com.optimaxx.management.interfaces.rest;
 
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
+import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateSaleTransactionStatusRequest;
 import com.optimaxx.management.security.SalesTransactionService;
@@ -43,5 +44,11 @@ public class SalesTransactionController {
     public SaleTransactionResponse updateStatus(@PathVariable UUID transactionId,
                                                 @RequestBody UpdateSaleTransactionStatusRequest request) {
         return salesTransactionService.updateStatus(transactionId, request);
+    }
+
+    @PostMapping("/{transactionId}/refund")
+    public SaleTransactionResponse refund(@PathVariable UUID transactionId,
+                                          @RequestBody RefundSaleTransactionRequest request) {
+        return salesTransactionService.refund(transactionId, request);
     }
 }

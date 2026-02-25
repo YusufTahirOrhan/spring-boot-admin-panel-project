@@ -9,10 +9,12 @@ import com.optimaxx.management.domain.repository.CustomerRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
+import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
 import com.optimaxx.management.interfaces.rest.dto.UpdateSaleTransactionStatusRequest;
 import com.optimaxx.management.security.audit.AuditEventType;
 import com.optimaxx.management.security.audit.SecurityAuditService;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -153,6 +155,54 @@ public class SalesTransactionService {
     }
 
     @Transactional
+    public SaleTransactionResponse refund(UUID transactionId, RefundSaleTransactionRequest request) {
+        if (request == null || request.amount() == null || request.amount().signum() <= 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "refund amount must be greater than zero");
+        }
+
+        SaleTransaction transaction = saleTransactionRepository.findByIdAndDeletedFalse(transactionId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Sale transaction not found"));
+
+        if (transaction.getStatus() == SaleTransactionStatus.CANCELED) {
+            throw new ResponseStatusException(BAD_REQUEST, "Canceled transaction cannot be refunded");
+        }
+
+        BigDecimal currentRefunded = transaction.getRefundedAmount() == null ? BigDecimal.ZERO : transaction.getRefundedAmount();
+        BigDecimal nextRefunded = currentRefunded.add(request.amount());
+        if (nextRefunded.compareTo(transaction.getAmount()) > 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "Refund amount exceeds transaction amount");
+        }
+
+        if (transaction.getInventoryItemId() != null && transaction.getInventoryQuantity() != null && !transaction.isStockReverted()) {
+            inventoryStockCoordinator.release(
+                    transaction.getInventoryItemId(),
+                    transaction.getInventoryQuantity(),
+                    "SALE refund rollback " + transaction.getId(),
+                    "SALE_TRANSACTION_REFUND",
+                    transaction.getId(),
+                    "sale:" + transaction.getId() + ":refund-rollback"
+            );
+            transaction.setStockReverted(true);
+        }
+
+        transaction.setRefundedAmount(nextRefunded);
+        transaction.setRefundedAt(Instant.now());
+        if (nextRefunded.compareTo(transaction.getAmount()) == 0) {
+            transaction.setStatus(SaleTransactionStatus.REFUNDED);
+        }
+
+        securityAuditService.log(
+                AuditEventType.SALE_TRANSACTION_REFUNDED,
+                null,
+                "SALE_TRANSACTION",
+                String.valueOf(transaction.getId()),
+                "{\"refundAmount\":" + request.amount() + "}"
+        );
+
+        return toResponse(transaction);
+    }
+
+    @Transactional
     public SaleTransactionResponse updateStatus(UUID transactionId, UpdateSaleTransactionStatusRequest request) {
         if (request == null || request.status() == null) {
             throw new ResponseStatusException(BAD_REQUEST, "status is required");
@@ -209,6 +259,8 @@ public class SalesTransactionService {
                 transaction.getCustomerId(),
                 transaction.getCustomerName(),
                 transaction.getAmount(),
+                transaction.getRefundedAmount(),
+                transaction.getRefundedAt(),
                 transaction.getNotes(),
                 transaction.getOccurredAt()
         );

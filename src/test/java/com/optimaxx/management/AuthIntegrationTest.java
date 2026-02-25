@@ -706,6 +706,32 @@ class AuthIntegrationTest {
     }
 
     @Test
+    void shouldRefundSalesTransactionForStaffRole() throws Exception {
+        String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
+        UUID transactionId = UUID.randomUUID();
+
+        com.optimaxx.management.domain.model.TransactionType type = new com.optimaxx.management.domain.model.TransactionType();
+        type.setCode("GLASS_SALE");
+
+        com.optimaxx.management.domain.model.SaleTransaction tx = new com.optimaxx.management.domain.model.SaleTransaction();
+        tx.setTransactionType(type);
+        tx.setStatus(com.optimaxx.management.domain.model.SaleTransactionStatus.COMPLETED);
+        tx.setAmount(new java.math.BigDecimal("100.00"));
+        tx.setInventoryItemId(UUID.randomUUID());
+        tx.setInventoryQuantity(1);
+
+        when(saleTransactionRepository.findByIdAndDeletedFalse(transactionId)).thenReturn(Optional.of(tx));
+
+        mockMvc.perform(post("/api/v1/sales/transactions/{id}/refund", transactionId)
+                        .header("Authorization", "Bearer " + staffToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{" + "\"amount\":100.00,\"reason\":\"return\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REFUNDED"))
+                .andExpect(jsonPath("$.refundedAmount").value(100.00));
+    }
+
+    @Test
     void shouldRejectSalesTransactionForInactiveType() throws Exception {
         String staffToken = jwtTokenService.generateAccessToken("staff1", "STAFF");
 

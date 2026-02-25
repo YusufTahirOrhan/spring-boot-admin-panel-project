@@ -17,6 +17,7 @@ import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.model.SaleTransactionStatus;
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
+import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.UpdateSaleTransactionStatusRequest;
 import com.optimaxx.management.security.InventoryStockCoordinator;
 import com.optimaxx.management.security.SalesTransactionService;
@@ -217,6 +218,38 @@ class SalesTransactionServiceTest {
 
         assertThat(response.status()).isEqualTo("CANCELED");
         assertThat(transaction.isStockReverted()).isTrue();
+    }
+
+    @Test
+    void shouldRefundSaleTransaction() {
+        SaleTransactionRepository saleRepository = Mockito.mock(SaleTransactionRepository.class);
+        TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        UUID txId = UUID.randomUUID();
+        UUID inventoryItemId = UUID.randomUUID();
+
+        TransactionType type = new TransactionType();
+        type.setCode("GLASS_SALE");
+
+        SaleTransaction transaction = new SaleTransaction();
+        transaction.setTransactionType(type);
+        transaction.setStatus(SaleTransactionStatus.COMPLETED);
+        transaction.setAmount(new BigDecimal("100.00"));
+        transaction.setInventoryItemId(inventoryItemId);
+        transaction.setInventoryQuantity(1);
+
+        when(saleRepository.findByIdAndDeletedFalse(txId)).thenReturn(Optional.of(transaction));
+        when(inventoryStockCoordinator.release(any(UUID.class), any(Integer.class), any(String.class), any(String.class), any(UUID.class), any(String.class)))
+                .thenReturn(new InventoryItem());
+
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, auditService, inventoryStockCoordinator);
+        var response = service.refund(txId, new RefundSaleTransactionRequest(new BigDecimal("100.00"), "return"));
+
+        assertThat(response.status()).isEqualTo("REFUNDED");
+        assertThat(response.refundedAmount()).isEqualByComparingTo("100.00");
     }
 
     @Test
