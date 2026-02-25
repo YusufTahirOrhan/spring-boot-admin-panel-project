@@ -7,6 +7,7 @@ import com.optimaxx.management.domain.repository.CustomerRepository;
 import com.optimaxx.management.domain.repository.InventoryItemRepository;
 import com.optimaxx.management.domain.repository.InventoryMovementRepository;
 import com.optimaxx.management.domain.repository.RepairOrderRepository;
+import com.optimaxx.management.domain.repository.LensPrescriptionRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
@@ -50,6 +51,9 @@ class OptiMaxxManagementApplicationTests {
 
     @MockitoBean
     private RepairOrderRepository repairOrderRepository;
+
+    @MockitoBean
+    private LensPrescriptionRepository lensPrescriptionRepository;
 
     @MockitoBean
     private InventoryItemRepository inventoryItemRepository;
