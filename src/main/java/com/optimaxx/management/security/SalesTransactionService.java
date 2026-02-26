@@ -12,6 +12,7 @@ import com.optimaxx.management.domain.repository.CustomerRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
+import com.optimaxx.management.interfaces.rest.dto.ReceiptVerificationResponse;
 import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.SalePaymentMethodSummaryResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionDetailResponse;
@@ -32,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -42,9 +44,14 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
+import static org.springframework.http.HttpStatus.TOO_MANY_REQUESTS;
 
 @Service
 public class SalesTransactionService {
+
+    private static final int RECEIPT_VERIFY_MAX_FAILURES = 5;
+    private static final long RECEIPT_VERIFY_WINDOW_SECONDS = 60;
+    private static final ConcurrentHashMap<String, VerifyAttempt> VERIFY_ATTEMPTS = new ConcurrentHashMap<>();
 
     private final SaleTransactionRepository saleTransactionRepository;
     private final TransactionTypeRepository transactionTypeRepository;
@@ -199,6 +206,42 @@ public class SalesTransactionService {
                 .collect(Collectors.joining("\n",
                         "receiptNumber,occurredAt,customerName,amount,refundedAmount,netAmount,paymentMethod,status\n",
                         "\n"));
+    }
+
+    @Transactional(readOnly = true)
+    public ReceiptVerificationResponse verifyReceipt(String receiptNumber) {
+        String normalized = trimToNull(receiptNumber);
+        if (normalized == null) {
+            throw new ResponseStatusException(BAD_REQUEST, "receiptNumber is required");
+        }
+
+        VerifyAttempt attempt = VERIFY_ATTEMPTS.computeIfAbsent(normalized, k -> new VerifyAttempt(0, Instant.now()));
+        Instant now = Instant.now();
+        if (attempt.windowStart().plusSeconds(RECEIPT_VERIFY_WINDOW_SECONDS).isBefore(now)) {
+            attempt = new VerifyAttempt(0, now);
+            VERIFY_ATTEMPTS.put(normalized, attempt);
+        }
+        if (attempt.failures() >= RECEIPT_VERIFY_MAX_FAILURES) {
+            throw new ResponseStatusException(TOO_MANY_REQUESTS, "Too many verify attempts. Try again later.");
+        }
+
+        VerifyAttempt finalAttempt = attempt;
+        return saleTransactionRepository.findByReceiptNumberAndDeletedFalse(normalized)
+                .map(tx -> {
+                    VERIFY_ATTEMPTS.remove(normalized);
+                    return new ReceiptVerificationResponse(
+                            true,
+                            tx.getReceiptNumber(),
+                            tx.getInvoiceNumber(),
+                            tx.getAmount(),
+                            tx.getStatus() == null ? SaleTransactionStatus.COMPLETED.name() : tx.getStatus().name(),
+                            tx.getOccurredAt()
+                    );
+                })
+                .orElseGet(() -> {
+                    VERIFY_ATTEMPTS.put(normalized, new VerifyAttempt(finalAttempt.failures() + 1, finalAttempt.windowStart()));
+                    return new ReceiptVerificationResponse(false, normalized, null, null, null, null);
+                });
     }
 
     @Transactional(readOnly = true)
@@ -633,5 +676,8 @@ public class SalesTransactionService {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private record VerifyAttempt(int failures, Instant windowStart) {
     }
 }

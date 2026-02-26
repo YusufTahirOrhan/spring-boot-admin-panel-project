@@ -1,6 +1,7 @@
 package com.optimaxx.management.interfaces.rest;
 
 import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
+import com.optimaxx.management.interfaces.rest.dto.ReceiptVerificationResponse;
 import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionDetailResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
@@ -49,6 +50,11 @@ public class SalesTransactionController {
                                               @RequestParam(value = "size", defaultValue = "20") int size,
                                               @RequestParam(value = "sort", defaultValue = "occurredAt,desc") String sort) {
         return salesTransactionService.list(from, to, query, paymentMethod, page, size, sort);
+    }
+
+    @GetMapping("/verify")
+    public ReceiptVerificationResponse verify(@RequestParam("receiptNumber") String receiptNumber) {
+        return salesTransactionService.verifyReceipt(receiptNumber);
     }
 
     @GetMapping("/summary")
