@@ -760,9 +760,8 @@ class AuthIntegrationTest {
         log.setOccurredAt(Instant.now());
 
         when(saleTransactionRepository.findByIdAndDeletedFalse(transactionId)).thenReturn(Optional.of(tx));
-        when(activityLogRepository.findByStoreIdAndResourceTypeAndResourceIdAndDeletedFalseOrderByOccurredAtDesc(
+        when(activityLogRepository.findUnifiedTimelineForSaleTransaction(
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),
-                "SALE_TRANSACTION",
                 transactionId.toString())).thenReturn(java.util.List.of(log));
 
         mockMvc.perform(get("/api/v1/sales/transactions/{id}", transactionId)
