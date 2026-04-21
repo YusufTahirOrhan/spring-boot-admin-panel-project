@@ -352,11 +352,7 @@ public class SalesTransactionService {
         }
 
         List<SaleTransactionTimelineEventResponse> timeline = activityLogRepository
-                .findByStoreIdAndResourceTypeAndResourceIdAndDeletedFalseOrderByOccurredAtDesc(
-                        storeId,
-                        "SALE_TRANSACTION",
-                        String.valueOf(transactionId)
-                )
+                .findUnifiedTimelineForSaleTransaction(storeId, String.valueOf(transactionId))
                 .stream()
                 .map(this::toTimelineResponse)
                 .toList();
@@ -500,13 +496,24 @@ public class SalesTransactionService {
         );
     }
 
+    private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
+
     private SaleTransactionTimelineEventResponse toTimelineResponse(ActivityLog log) {
+        java.util.Map<String, Object> details = java.util.Collections.emptyMap();
+        try {
+            if (log.getAfterJson() != null && !log.getAfterJson().isBlank()) {
+                details = OBJECT_MAPPER.readValue(log.getAfterJson(), new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Object>>() {});
+            }
+        } catch (Exception e) {
+            // fallback, details remains empty
+        }
+
         return new SaleTransactionTimelineEventResponse(
                 log.getId(),
                 log.getAction(),
                 log.getResourceType(),
                 log.getResourceId(),
-                log.getAfterJson(),
+                details,
                 log.getOccurredAt()
         );
     }

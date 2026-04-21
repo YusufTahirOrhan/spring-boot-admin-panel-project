@@ -7,6 +7,6 @@ public record SaleTransactionTimelineEventResponse(UUID id,
                                                    String eventType,
                                                    String resourceType,
                                                    String resourceId,
-                                                   String afterJson,
+                                                   java.util.Map<String, Object> details,
                                                    Instant occurredAt) {
 }

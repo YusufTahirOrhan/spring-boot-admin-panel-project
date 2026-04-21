@@ -422,9 +422,8 @@ class SalesTransactionServiceTest {
         log.setOccurredAt(Instant.now());
 
         when(saleRepository.findByIdAndDeletedFalse(txId)).thenReturn(Optional.of(tx));
-        when(activityLogRepository.findByStoreIdAndResourceTypeAndResourceIdAndDeletedFalseOrderByOccurredAtDesc(
+        when(activityLogRepository.findUnifiedTimelineForSaleTransaction(
                 UUID.fromString("00000000-0000-0000-0000-000000000001"),
-                "SALE_TRANSACTION",
                 txId.toString())).thenReturn(List.of(log));
 
         SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
