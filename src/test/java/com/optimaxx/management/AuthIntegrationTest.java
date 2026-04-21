@@ -24,6 +24,7 @@ import com.optimaxx.management.domain.repository.LensPrescriptionRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
+import com.optimaxx.management.application.AdminAnalyticsService;
 import com.optimaxx.management.security.ForgotPasswordAttemptService;
 import com.optimaxx.management.security.LoginAttemptService;
 import com.optimaxx.management.security.jwt.JwtTokenService;
@@ -111,6 +112,9 @@ class AuthIntegrationTest {
 
     @MockitoBean
     private com.optimaxx.management.domain.repository.LeadRepository leadRepository;
+
+    @MockitoBean
+    private AdminAnalyticsService adminAnalyticsService;
 
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();

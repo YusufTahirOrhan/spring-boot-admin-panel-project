@@ -1,0 +1,15 @@
+# Previous Chat 4 - Unified Timeline & Stability
+
+## Completed Tasks In This Session:
+- Addressed `feat/sales-transaction-detail-and-timeline`
+- Recognized that while standard timeline events were present, inventory and stock rollback triggers from PostgreSQL generated scattered activity logs linked by JSON.
+- Created `findUnifiedTimelineForSaleTransaction` taking advantage of PostgreSQL Native JSONB operators (`CAST(a.after_json AS jsonb) ->> 'saleTransactionId'`).
+- Converted the `SaleTransactionTimelineEventResponse` to return strong typed objects (`Map<String, Object> details`).
+- Enforced 100% strict English language across code.
+- Maintained Soft Delete and multi-store contexts successfully.
+- Asserted everything with `./mvnw test` ensuring all 98 tests pass reliably.
+- Pushed the stable feature to origin as PR context.
+- Discussed post-MVP implementations highlighting public API design and custom reporting charts/analytics.
+
+## Next Step Proposals:
+Proceeding with either Option 1 (Public Site APIs) or Option 3 (Admin Analytics/Dashboards).

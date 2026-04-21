@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface SaleTransactionRepository extends JpaRepository<SaleTransaction, UUID> {
 
@@ -34,4 +35,31 @@ public interface SaleTransactionRepository extends JpaRepository<SaleTransaction
     List<SaleTransaction> findByDeletedFalseOrderByOccurredAtDesc();
 
     List<SaleTransaction> findByOccurredAtGreaterThanEqualAndDeletedFalseOrderByOccurredAtDesc(Instant occurredAt);
+
+    // ── Analytics queries ────────────────────────────────────────────────────
+
+    @Query("SELECT coalesce(sum(s.amount), 0) FROM SaleTransaction s " +
+           "WHERE s.storeId = :storeId AND s.deleted = false " +
+           "  AND s.occurredAt >= :from AND s.occurredAt <= :to " +
+           "  AND s.status IN (com.optimaxx.management.domain.model.SaleTransactionStatus.COMPLETED, " +
+           "                   com.optimaxx.management.domain.model.SaleTransactionStatus.REFUNDED)")
+    BigDecimal sumRevenueInRange(@Param("storeId") UUID storeId,
+                                 @Param("from") Instant from,
+                                 @Param("to") Instant to);
+
+    @Query("SELECT count(s) FROM SaleTransaction s " +
+           "WHERE s.storeId = :storeId AND s.deleted = false " +
+           "  AND s.occurredAt >= :from AND s.occurredAt <= :to")
+    long countInRange(@Param("storeId") UUID storeId,
+                      @Param("from") Instant from,
+                      @Param("to") Instant to);
+
+    @Query("SELECT s.transactionType.category, coalesce(sum(s.amount), 0) " +
+           "FROM SaleTransaction s " +
+           "WHERE s.storeId = :storeId AND s.deleted = false " +
+           "  AND s.occurredAt >= :from AND s.occurredAt <= :to " +
+           "GROUP BY s.transactionType.category")
+    List<Object[]> revenueByCategory(@Param("storeId") UUID storeId,
+                                     @Param("from") Instant from,
+                                     @Param("to") Instant to);
 }
