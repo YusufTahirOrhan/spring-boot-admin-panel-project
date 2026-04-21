@@ -1,0 +1,37 @@
+# Previous Chat 5 - Public Site APIs (Option 1)
+
+## Completed Tasks In This Session:
+- Addressed `feat/public-site-apis` feature branch.
+- Created `Lead` entity (id, name, email, message, serviceInterest, status) and `LeadStatus` enum (NEW, CONTACTED, RESOLVED, ARCHIVED).
+- Implemented `LeadRepository` for persisting public contact form submissions.
+- Created `PublicCatalogService` with `@Cacheable` Redis caching for frames and lenses.
+- Created `PublicCatalogController` exposing:
+  - GET /api/v1/public/catalog/frames (paginated, cached)
+  - GET /api/v1/public/catalog/lenses (paginated, cached)
+- Created `PublicStoreController` exposing:
+  - GET /api/v1/public/services (static, cached)
+  - GET /api/v1/public/store-info (static, cached)
+  - POST /api/v1/public/contact (validated, saved as Lead to PostgreSQL)
+- Created `ContactRequest` DTO with Bean Validation (@NotBlank, @Email, @Size).
+- Added `spring-boot-starter-validation` dependency to pom.xml.
+- Updated `SecurityConfig` to `.requestMatchers("/api/v1/public/**").permitAll()`.
+- Added `MethodArgumentNotValidException` handler to `ApiExceptionHandler` (returns 400).
+- Fixed CI failure: added `@MockitoBean LeadRepository` to `AuthIntegrationTest` and `OptiMaxxManagementApplicationTests`.
+- All 102 tests pass successfully.
+- Pushed 2 commits to origin/feat/public-site-apis:
+  - feat: implement public site APIs for OptiMaxx landing page
+  - fix: add missing LeadRepository mock to AuthIntegrationTest and OptiMaxxManagementApplicationTests
+
+## Previous Branch State:
+- `feat/sales-transaction-detail-and-timeline` is the parent branch (stable, all tests passing at the time of branching).
+- `feat/public-site-apis` branched off from it and has been fully tested.
+
+## Next Step Proposals:
+Proceeding with Option 3 (Admin Analytics Dashboard) in a new conversation.
+- Target endpoints under /api/v1/admin/analytics/
+- Revenue summary (startDate, endDate params), sales trend by category
+- Staff performance aggregation per employee_id
+- Inventory low-stock alert endpoint (threshold from InventoryItem.minQuantity)
+- High-risk ClickHouse audit event query endpoint
+- Role-protected: OWNER and ADMIN only (@PreAuthorize)
+- Tests must be added to AuthIntegrationTest and a new AdminAnalyticsIntegrationTest
