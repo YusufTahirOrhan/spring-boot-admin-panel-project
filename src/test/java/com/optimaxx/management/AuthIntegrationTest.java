@@ -109,6 +109,9 @@ class AuthIntegrationTest {
     @MockitoBean
     private com.optimaxx.management.security.InventoryStockCoordinator inventoryStockCoordinator;
 
+    @MockitoBean
+    private com.optimaxx.management.domain.repository.LeadRepository leadRepository;
+
     private MockMvc mockMvc;
     private final Map<String, RefreshToken> refreshTokenStore = new ConcurrentHashMap<>();
 
