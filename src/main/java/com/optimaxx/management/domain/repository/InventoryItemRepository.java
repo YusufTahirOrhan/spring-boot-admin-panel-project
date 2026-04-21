@@ -13,4 +13,6 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, UU
     Optional<InventoryItem> findByIdAndDeletedFalse(UUID id);
 
     List<InventoryItem> findByDeletedFalseOrderByNameAsc();
+
+    org.springframework.data.domain.Page<InventoryItem> findByCategoryAndQuantityGreaterThanAndDeletedFalse(String category, int quantity, org.springframework.data.domain.Pageable pageable);
 }
