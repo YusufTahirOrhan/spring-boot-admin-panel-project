@@ -11,6 +11,7 @@ import com.optimaxx.management.domain.repository.LensPrescriptionRepository;
 import com.optimaxx.management.domain.repository.SaleTransactionRepository;
 import com.optimaxx.management.domain.repository.TransactionTypeRepository;
 import com.optimaxx.management.domain.repository.UserRepository;
+import com.optimaxx.management.domain.repository.LeadRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -60,6 +61,12 @@ class OptiMaxxManagementApplicationTests {
 
     @MockitoBean
     private InventoryMovementRepository inventoryMovementRepository;
+
+    @MockitoBean
+    private LeadRepository leadRepository;
+
+    @MockitoBean
+    private com.optimaxx.management.security.InventoryStockCoordinator inventoryStockCoordinator;
 
     @Test
     void contextLoads() {
