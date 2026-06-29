@@ -108,6 +108,9 @@ class AuthIntegrationTest {
     private InventoryMovementRepository inventoryMovementRepository;
 
     @MockitoBean
+    private com.optimaxx.management.domain.repository.SitePageBlockRepository sitePageBlockRepository;
+
+    @MockitoBean
     private com.optimaxx.management.security.InventoryStockCoordinator inventoryStockCoordinator;
 
     @MockitoBean

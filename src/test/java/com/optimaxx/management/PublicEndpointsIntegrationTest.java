@@ -60,6 +60,9 @@ public class PublicEndpointsIntegrationTest {
     private com.optimaxx.management.domain.repository.InventoryMovementRepository inventoryMovementRepository;
 
     @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.optimaxx.management.domain.repository.SitePageBlockRepository sitePageBlockRepository;
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
     private com.optimaxx.management.domain.repository.RefreshTokenRepository refreshTokenRepository;
 
     @org.springframework.test.context.bean.override.mockito.MockitoBean
@@ -89,6 +92,14 @@ public class PublicEndpointsIntegrationTest {
         mockMvc.perform(get("/api/v1/public/services"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("SRV-01"));
+    }
+
+    @Test
+    void shouldReturnPublishedHomePageWithoutAuthentication() throws Exception {
+        mockMvc.perform(get("/api/v1/public/pages/home"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.page").value("HOME"))
+                .andExpect(jsonPath("$.blocks[0].type").value("hero"));
     }
 
     @Test

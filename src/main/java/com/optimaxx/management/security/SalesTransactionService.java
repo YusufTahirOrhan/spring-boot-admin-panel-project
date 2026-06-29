@@ -3,6 +3,7 @@ package com.optimaxx.management.security;
 import com.optimaxx.management.domain.model.Customer;
 import com.optimaxx.management.domain.model.SalePaymentMethod;
 import com.optimaxx.management.domain.model.SaleTransaction;
+import com.optimaxx.management.domain.model.SaleTransactionItem;
 import com.optimaxx.management.domain.model.SaleTransactionStatus;
 import com.optimaxx.management.domain.model.ActivityLog;
 import com.optimaxx.management.domain.model.TransactionType;
@@ -15,6 +16,7 @@ import com.optimaxx.management.interfaces.rest.dto.CreateSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.ReceiptVerificationResponse;
 import com.optimaxx.management.interfaces.rest.dto.RefundSaleTransactionRequest;
 import com.optimaxx.management.interfaces.rest.dto.SalePaymentMethodSummaryResponse;
+import com.optimaxx.management.interfaces.rest.dto.SaleTransactionLineItemRequest;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionDetailResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionResponse;
 import com.optimaxx.management.interfaces.rest.dto.SaleTransactionSummaryResponse;
@@ -32,6 +34,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.ArrayList;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.data.domain.Page;
@@ -93,9 +96,7 @@ public class SalesTransactionService {
             throw new ResponseStatusException(BAD_REQUEST, "Transaction type category must be SALE");
         }
 
-        if ((request.inventoryItemId() == null) != (request.inventoryQuantity() == null)) {
-            throw new ResponseStatusException(BAD_REQUEST, "inventoryItemId and inventoryQuantity must be provided together");
-        }
+        List<SaleTransactionItem> lineItems = resolveLineItems(request);
 
         Customer customer = null;
         String customerName = trimToNull(request.customerName());
@@ -133,26 +134,11 @@ public class SalesTransactionService {
         saleTransaction.setInventoryQuantity(request.inventoryQuantity());
         saleTransaction.setStockReverted(false);
         saleTransaction.setDeleted(false);
+        lineItems.forEach(saleTransaction::addItem);
 
         SaleTransaction saved = saleTransactionRepository.save(saleTransaction);
 
-        if (request.inventoryItemId() != null) {
-            var item = inventoryStockCoordinator.consume(
-                    request.inventoryItemId(),
-                    request.inventoryQuantity(),
-                    "SALE transaction " + saved.getId(),
-                    "SALE_TRANSACTION",
-                    saved.getId(),
-                    "sale:" + saved.getId() + ":consume"
-            );
-            securityAuditService.log(
-                    AuditEventType.SALE_STOCK_DEDUCTED,
-                    null,
-                    "INVENTORY",
-                    item.getSku(),
-                    "{\"saleTransactionId\":\"" + saved.getId() + "\",\"quantity\":" + request.inventoryQuantity() + "}"
-            );
-        }
+        consumeLineItemStock(saved, lineItems);
 
         securityAuditService.log(
                 AuditEventType.SALE_TRANSACTION_CREATED,
@@ -379,15 +365,8 @@ public class SalesTransactionService {
             throw new ResponseStatusException(BAD_REQUEST, "Refund amount exceeds transaction amount");
         }
 
-        if (transaction.getInventoryItemId() != null && transaction.getInventoryQuantity() != null && !transaction.isStockReverted()) {
-            inventoryStockCoordinator.release(
-                    transaction.getInventoryItemId(),
-                    transaction.getInventoryQuantity(),
-                    "SALE refund rollback " + transaction.getId(),
-                    "SALE_TRANSACTION_REFUND",
-                    transaction.getId(),
-                    "sale:" + transaction.getId() + ":refund-rollback"
-            );
+        if (!transaction.isStockReverted()) {
+            releaseLineItemStock(transaction, "SALE refund rollback ", "SALE_TRANSACTION_REFUND", "refund-rollback");
             transaction.setStockReverted(true);
         }
 
@@ -425,15 +404,8 @@ public class SalesTransactionService {
         }
 
         if (request.status() == SaleTransactionStatus.CANCELED) {
-            if (transaction.getInventoryItemId() != null && transaction.getInventoryQuantity() != null && !transaction.isStockReverted()) {
-                inventoryStockCoordinator.release(
-                        transaction.getInventoryItemId(),
-                        transaction.getInventoryQuantity(),
-                        "SALE cancel rollback " + transaction.getId(),
-                        "SALE_TRANSACTION_CANCEL",
-                        transaction.getId(),
-                        "sale:" + transaction.getId() + ":cancel-rollback"
-                );
+            if (!transaction.isStockReverted()) {
+                releaseLineItemStock(transaction, "SALE cancel rollback ", "SALE_TRANSACTION_CANCEL", "cancel-rollback");
                 transaction.setStockReverted(true);
             }
 
@@ -472,6 +444,105 @@ public class SalesTransactionService {
                 transaction.getNotes(),
                 transaction.getOccurredAt()
         );
+    }
+
+    private List<SaleTransactionItem> resolveLineItems(CreateSaleTransactionRequest request) {
+        if (request.items() != null && !request.items().isEmpty()) {
+            List<SaleTransactionItem> items = new ArrayList<>();
+            for (SaleTransactionLineItemRequest itemRequest : request.items()) {
+                if (itemRequest == null || itemRequest.inventoryItemId() == null) {
+                    throw new ResponseStatusException(BAD_REQUEST, "Each sale item must include inventoryItemId");
+                }
+                int quantity = itemRequest.quantity() == null ? 0 : itemRequest.quantity();
+                if (quantity <= 0) {
+                    throw new ResponseStatusException(BAD_REQUEST, "Each sale item quantity must be greater than zero");
+                }
+
+                BigDecimal unitPrice = itemRequest.unitPrice() == null ? BigDecimal.ZERO : itemRequest.unitPrice();
+                BigDecimal lineTotal = itemRequest.lineTotal() == null ? unitPrice.multiply(BigDecimal.valueOf(quantity)) : itemRequest.lineTotal();
+                if (unitPrice.signum() < 0 || lineTotal.signum() < 0) {
+                    throw new ResponseStatusException(BAD_REQUEST, "Sale item prices cannot be negative");
+                }
+
+                SaleTransactionItem item = new SaleTransactionItem();
+                item.setInventoryItemId(itemRequest.inventoryItemId());
+                item.setName(trimToNull(itemRequest.name()) == null ? "Inventory item" : itemRequest.name().trim());
+                item.setSku(trimToNull(itemRequest.sku()));
+                item.setQuantity(quantity);
+                item.setUnitPrice(unitPrice);
+                item.setLineTotal(lineTotal);
+                items.add(item);
+            }
+            return items;
+        }
+
+        if ((request.inventoryItemId() == null) != (request.inventoryQuantity() == null)) {
+            throw new ResponseStatusException(BAD_REQUEST, "inventoryItemId and inventoryQuantity must be provided together");
+        }
+        if (request.inventoryItemId() == null) {
+            return List.of();
+        }
+        if (request.inventoryQuantity() <= 0) {
+            throw new ResponseStatusException(BAD_REQUEST, "inventoryQuantity must be greater than zero");
+        }
+
+        SaleTransactionItem item = new SaleTransactionItem();
+        item.setInventoryItemId(request.inventoryItemId());
+        item.setName("Inventory item");
+        item.setQuantity(request.inventoryQuantity());
+        item.setUnitPrice(BigDecimal.ZERO);
+        item.setLineTotal(BigDecimal.ZERO);
+        return List.of(item);
+    }
+
+    private void consumeLineItemStock(SaleTransaction saved, List<SaleTransactionItem> lineItems) {
+        for (int i = 0; i < lineItems.size(); i++) {
+            SaleTransactionItem line = lineItems.get(i);
+            var item = inventoryStockCoordinator.consume(
+                    line.getInventoryItemId(),
+                    line.getQuantity(),
+                    "SALE transaction " + saved.getId(),
+                    "SALE_TRANSACTION",
+                    saved.getId(),
+                    "sale:" + saved.getId() + ":item:" + i + ":consume"
+            );
+            securityAuditService.log(
+                    AuditEventType.SALE_STOCK_DEDUCTED,
+                    null,
+                    "INVENTORY",
+                    item.getSku(),
+                    "{\"saleTransactionId\":\"" + saved.getId() + "\",\"inventoryItemId\":\"" + line.getInventoryItemId() + "\",\"quantity\":" + line.getQuantity() + "}"
+            );
+        }
+    }
+
+    private void releaseLineItemStock(SaleTransaction transaction, String reasonPrefix, String sourceType, String idempotencySuffix) {
+        List<SaleTransactionItem> items = transaction.getItems() == null ? List.of() : transaction.getItems();
+        if (!items.isEmpty()) {
+            for (int i = 0; i < items.size(); i++) {
+                SaleTransactionItem line = items.get(i);
+                inventoryStockCoordinator.release(
+                        line.getInventoryItemId(),
+                        line.getQuantity(),
+                        reasonPrefix + transaction.getId(),
+                        sourceType,
+                        transaction.getId(),
+                        "sale:" + transaction.getId() + ":item:" + i + ":" + idempotencySuffix
+                );
+            }
+            return;
+        }
+
+        if (transaction.getInventoryItemId() != null && transaction.getInventoryQuantity() != null) {
+            inventoryStockCoordinator.release(
+                    transaction.getInventoryItemId(),
+                    transaction.getInventoryQuantity(),
+                    reasonPrefix + transaction.getId(),
+                    sourceType,
+                    transaction.getId(),
+                    "sale:" + transaction.getId() + ":" + idempotencySuffix
+            );
+        }
     }
 
     private SaleTransactionDetailResponse toDetailResponse(SaleTransaction transaction,

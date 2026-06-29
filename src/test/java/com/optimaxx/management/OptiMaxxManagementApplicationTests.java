@@ -67,6 +67,9 @@ class OptiMaxxManagementApplicationTests {
     private LeadRepository leadRepository;
 
     @MockitoBean
+    private com.optimaxx.management.domain.repository.SitePageBlockRepository sitePageBlockRepository;
+
+    @MockitoBean
     private AdminAnalyticsService adminAnalyticsService;
 
     @MockitoBean

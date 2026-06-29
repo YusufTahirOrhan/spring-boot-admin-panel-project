@@ -5,6 +5,7 @@ import com.optimaxx.management.interfaces.rest.dto.AdminUpdateUserRoleRequest;
 import com.optimaxx.management.interfaces.rest.dto.AdminUpdateUserStatusRequest;
 import com.optimaxx.management.interfaces.rest.dto.UserResponse;
 import com.optimaxx.management.security.UserManagementService;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -33,6 +34,11 @@ public class AdminUserController {
     @ResponseStatus(HttpStatus.CREATED)
     public UserResponse createUser(@RequestBody AdminCreateUserRequest request) {
         return userManagementService.createUser(request);
+    }
+
+    @GetMapping
+    public List<UserResponse> listUsers() {
+        return userManagementService.listUsers();
     }
 
     @GetMapping("/{userId}")

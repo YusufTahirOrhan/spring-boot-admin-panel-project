@@ -21,6 +21,12 @@ clickhouse:
   password: ${CLICKHOUSE_PASSWORD}
 
 security:
+  bootstrap:
+    owner:
+      enabled: ${BOOTSTRAP_OWNER_ENABLED:false}
+      username: ${BOOTSTRAP_OWNER_USERNAME:}
+      email: ${BOOTSTRAP_OWNER_EMAIL:}
+      password: ${BOOTSTRAP_OWNER_PASSWORD:}
   jwt:
     secret-key: ${JWT_SECRET_KEY}
     access-token-minutes: ${JWT_ACCESS_MINUTES:60}
