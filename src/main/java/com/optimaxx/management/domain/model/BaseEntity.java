@@ -5,6 +5,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -56,4 +58,20 @@ public abstract class BaseEntity {
     public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
     public UUID getDeletedBy() { return deletedBy; }
     public void setDeletedBy(UUID deletedBy) { this.deletedBy = deletedBy; }
+
+    @PrePersist
+    protected void onCreate() {
+        Instant now = Instant.now();
+        if (createdAt == null) {
+            createdAt = now;
+        }
+        if (updatedAt == null) {
+            updatedAt = now;
+        }
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
+    }
 }

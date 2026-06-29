@@ -16,7 +16,7 @@ spring:
     open-in-view: false
 
 clickhouse:
-  url: jdbc:clickhouse://localhost:8123/default
+  url: http://localhost:8123
   username: default
   password: ""
 
