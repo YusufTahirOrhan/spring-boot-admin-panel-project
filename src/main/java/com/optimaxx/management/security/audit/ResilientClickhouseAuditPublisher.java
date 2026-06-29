@@ -9,6 +9,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -25,6 +28,8 @@ public class ResilientClickhouseAuditPublisher implements ClickhouseAuditPublish
 
     private static final Logger log = LoggerFactory.getLogger(ResilientClickhouseAuditPublisher.class);
     private static final String INSERT_QUERY = "INSERT INTO audit_events FORMAT JSONEachRow";
+    private static final DateTimeFormatter CLICKHOUSE_TIMESTAMP_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS").withZone(ZoneOffset.UTC);
 
     private final ClickhouseProperties clickhouseProperties;
     private final ClickhouseAuditRetryProperties retryProperties;
@@ -154,7 +159,7 @@ public class ResilientClickhouseAuditPublisher implements ClickhouseAuditPublish
     private String toJsonEachRow(ActivityLog logItem) {
         return "{" +
                 "\"event_id\":\"" + safe(logItem.getId()) + "\"," +
-                "\"timestamp\":\"" + safe(logItem.getOccurredAt()) + "\"," +
+                "\"timestamp\":\"" + formatTimestamp(logItem.getOccurredAt()) + "\"," +
                 "\"actor_user_id\":\"" + safe(logItem.getActorUserId()) + "\"," +
                 "\"actor_role\":\"" + escape(logItem.getActorRole()) + "\"," +
                 "\"action\":\"" + escape(logItem.getAction()) + "\"," +
@@ -182,6 +187,10 @@ public class ResilientClickhouseAuditPublisher implements ClickhouseAuditPublish
                 .replace("\"", "\\\"")
                 .replace("\n", "\\n")
                 .replace("\r", "\\r");
+    }
+
+    private String formatTimestamp(Instant instant) {
+        return instant == null ? "" : CLICKHOUSE_TIMESTAMP_FORMATTER.format(instant);
     }
 
     private boolean isBlank(String value) {

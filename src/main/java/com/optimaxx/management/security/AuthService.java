@@ -85,7 +85,7 @@ public class AuthService {
             throw ex;
         }
 
-        User user = userRepository.findByUsernameAndDeletedFalse(normalizedUsername)
+        User user = findUserForLogin(normalizedUsername)
                 .orElseThrow(() -> {
                     loginAttemptService.onFailedAttempt(normalizedUsername);
                     securityAuditService.log(AuditEventType.LOGIN_FAILED, null, "AUTH", normalizedUsername, "{\"reason\":\"user-not-found\"}");
@@ -101,6 +101,14 @@ public class AuthService {
         loginAttemptService.onSuccessfulAttempt(normalizedUsername);
         securityAuditService.log(AuditEventType.LOGIN_SUCCESS, user, "AUTH", normalizedUsername, "{\"status\":\"success\"}");
         return issueTokenPair(user, deviceId, userAgent, ipAddress);
+    }
+
+    private java.util.Optional<User> findUserForLogin(String usernameOrEmail) {
+        java.util.Optional<User> byUsername = userRepository.findByUsernameAndDeletedFalse(usernameOrEmail);
+        if (byUsername.isPresent()) {
+            return byUsername;
+        }
+        return userRepository.findByEmailAndDeletedFalse(usernameOrEmail.toLowerCase());
     }
 
     @Transactional

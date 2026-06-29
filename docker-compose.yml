@@ -19,6 +19,8 @@ services:
       - "9000:9000"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./docker/clickhouse/users.d/optimaxx-user.xml:/etc/clickhouse-server/users.d/optimaxx-user.xml:ro
+      - ./src/main/resources/db/clickhouse/audit_events.sql:/docker-entrypoint-initdb.d/audit_events.sql:ro
 
   redis:
     image: redis:8-alpine

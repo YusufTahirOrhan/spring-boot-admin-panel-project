@@ -44,6 +44,10 @@ management:
     health:
       show-details: never
 
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
+
 logging:
   level:
     root: INFO

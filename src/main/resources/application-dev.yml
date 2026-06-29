@@ -20,8 +20,8 @@ spring:
 
 clickhouse:
   url: http://localhost:8123
-  username: default
-  password: ""
+  username: optimaxx
+  password: optimaxx
 
 security:
   jwt:

@@ -76,6 +76,40 @@ class AuthServiceTest {
     }
 
     @Test
+    void shouldGenerateTokenWhenLoginUsesEmail() {
+        JwtProperties jwtProperties = new JwtProperties("this-is-a-very-long-dev-secret-key-for-tests-123456", 60, 120, "test");
+        JwtTokenService jwtTokenService = new JwtTokenService(jwtProperties);
+
+        UserRepository userRepository = Mockito.mock(UserRepository.class);
+        RefreshTokenRepository refreshTokenRepository = Mockito.mock(RefreshTokenRepository.class);
+        PasswordResetTokenRepository passwordResetTokenRepository = Mockito.mock(PasswordResetTokenRepository.class);
+        PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
+
+        User user = createActiveUser();
+        when(userRepository.findByUsernameAndDeletedFalse("owner@optimaxx.local")).thenReturn(Optional.empty());
+        when(userRepository.findByEmailAndDeletedFalse("owner@optimaxx.local")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("owner123", "hashed")).thenReturn(true);
+
+        AuthService authService = new AuthService(
+                userRepository,
+                refreshTokenRepository,
+                passwordResetTokenRepository,
+                passwordEncoder,
+                createLoginAttemptService(),
+                createForgotPasswordAttemptService(),
+                jwtTokenService,
+                jwtProperties,
+                Mockito.mock(SecurityAuditService.class)
+        );
+
+        AuthLoginResponse response = authService.login(new AuthLoginRequest("owner@optimaxx.local", "owner123"), "device-1", null, null);
+
+        assertThat(response.accessToken()).isNotBlank();
+        assertThat(response.role()).isEqualTo("OWNER");
+        verify(refreshTokenRepository).save(any(RefreshToken.class));
+    }
+
+    @Test
     void shouldRejectInvalidCredentialsWhenUserNotFound() {
         AuthService authService = createAuthServiceReturning(Optional.empty());
 
@@ -346,6 +380,7 @@ class AuthServiceTest {
         PasswordEncoder passwordEncoder = Mockito.mock(PasswordEncoder.class);
 
         when(userRepository.findByUsernameAndDeletedFalse(anyString())).thenReturn(userOptional);
+        when(userRepository.findByEmailAndDeletedFalse(anyString())).thenReturn(userOptional);
 
         return new AuthService(
                 userRepository,
@@ -381,6 +416,7 @@ class AuthServiceTest {
     private User createActiveUser() {
         User user = new User();
         user.setUsername("owner");
+        user.setEmail("owner@optimaxx.local");
         user.setPasswordHash("hashed");
         user.setRole(UserRole.OWNER);
         user.setActive(true);

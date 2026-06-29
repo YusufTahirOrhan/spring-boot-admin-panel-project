@@ -28,3 +28,7 @@ security:
       username: ${BOOTSTRAP_OWNER_USERNAME:owner}
       email: ${BOOTSTRAP_OWNER_EMAIL:owner@optimaxx.local}
       password: ${BOOTSTRAP_OWNER_PASSWORD:owner12345}
+
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}

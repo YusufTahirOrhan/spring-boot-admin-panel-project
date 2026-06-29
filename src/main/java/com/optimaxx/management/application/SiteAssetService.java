@@ -4,7 +4,7 @@ import com.optimaxx.management.interfaces.rest.dto.AssetUploadResponse;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
@@ -37,11 +37,16 @@ public class SiteAssetService {
         }
 
         try {
+            byte[] bytes = file.getBytes();
+            if (!hasValidSignature(contentType, bytes)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File content does not match an allowed image type");
+            }
+
             Files.createDirectories(uploadDirectory);
             String extension = extensionFor(contentType);
             String filename = UUID.randomUUID() + extension;
             Path target = uploadDirectory.resolve(filename).normalize();
-            Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
+            Files.write(target, bytes, StandardOpenOption.CREATE_NEW);
             String url = ServletUriComponentsBuilder.fromCurrentContextPath()
                     .path("/api/v1/public/assets/site/")
                     .path(filename)
@@ -86,5 +91,45 @@ public class SiteAssetService {
             case "image/gif" -> ".gif";
             default -> ".jpg";
         };
+    }
+
+    private boolean hasValidSignature(String contentType, byte[] bytes) {
+        return switch (contentType.toLowerCase(Locale.ROOT)) {
+            case "image/jpeg" -> startsWith(bytes, 0xFF, 0xD8, 0xFF);
+            case "image/png" -> startsWith(bytes, 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A);
+            case "image/gif" -> startsWithAscii(bytes, "GIF87a") || startsWithAscii(bytes, "GIF89a");
+            case "image/webp" -> bytes.length >= 12
+                    && asciiEquals(bytes, 0, "RIFF")
+                    && asciiEquals(bytes, 8, "WEBP");
+            default -> false;
+        };
+    }
+
+    private boolean startsWith(byte[] bytes, int... prefix) {
+        if (bytes.length < prefix.length) {
+            return false;
+        }
+        for (int index = 0; index < prefix.length; index++) {
+            if ((bytes[index] & 0xFF) != prefix[index]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean startsWithAscii(byte[] bytes, String prefix) {
+        return asciiEquals(bytes, 0, prefix);
+    }
+
+    private boolean asciiEquals(byte[] bytes, int offset, String expected) {
+        if (bytes.length < offset + expected.length()) {
+            return false;
+        }
+        for (int index = 0; index < expected.length(); index++) {
+            if (bytes[offset + index] != (byte) expected.charAt(index)) {
+                return false;
+            }
+        }
+        return true;
     }
 }

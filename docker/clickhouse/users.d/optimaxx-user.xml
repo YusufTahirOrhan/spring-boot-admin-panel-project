@@ -1,0 +1,12 @@
+<clickhouse>
+  <users>
+    <optimaxx>
+      <password>optimaxx</password>
+      <networks>
+        <ip>::/0</ip>
+      </networks>
+      <profile>default</profile>
+      <quota>default</quota>
+    </optimaxx>
+  </users>
+</clickhouse>
