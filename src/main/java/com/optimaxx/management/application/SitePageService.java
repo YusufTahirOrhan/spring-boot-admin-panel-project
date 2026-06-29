@@ -26,7 +26,7 @@ public class SitePageService {
     private static final TypeReference<Map<String, Object>> CONTENT_TYPE = new TypeReference<>() {
     };
     private static final List<String> SUPPORTED_BLOCKS = List.of(
-            "hero", "services", "featuredProducts", "about", "contact", "hours", "cta"
+            "hero", "services", "featuredProducts", "brandShowcase", "about", "contact", "hours", "cta", "socialLinks"
     );
 
     private final SitePageBlockRepository sitePageBlockRepository;
@@ -180,22 +180,106 @@ public class SitePageService {
         return List.of(
                 new SitePageBlockResponse(null, "hero", 0, true, Map.of(
                         "title", "OptiMaxx Optik",
-                        "subtitle", "Göz sağlığınız ve stiliniz için modern optik çözümler.",
-                        "eyebrow", "Optik mağazası",
-                        "primaryButtonLabel", "Randevu Al",
-                        "primaryButtonHref", "#contact",
+                        "subtitle", "Göz sağlığınız, net görüş ve stiliniz için modern optik çözümler.",
+                        "eyebrow", "Mahallenizin modern optik mağazası",
+                        "primaryButtonLabel", "",
+                        "primaryButtonHref", "",
+                        "secondaryButtonLabel", "Koleksiyonları İncele",
+                        "secondaryButtonHref", "#products",
+                        "highlights", List.of("Optik cam danışmanlığı", "Çerçeve seçimi", "Hızlı bakım"),
                         "imageUrl", ""
                 )),
                 new SitePageBlockResponse(null, "services", 1, true, Map.of(
                         "title", "Hizmetlerimiz",
                         "subtitle", "Mağazada sunduğumuz temel optik hizmetler.",
-                        "items", List.of("Gözlük çerçevesi", "Optik cam", "Kontakt lens", "Tamir ve ayar")
+                        "items", List.of("Optik cam danışmanlığı", "Gözlük çerçevesi", "Kontakt lens", "Tamir ve ayar")
                 )),
-                new SitePageBlockResponse(null, "contact", 2, true, Map.of(
+                new SitePageBlockResponse(null, "featuredProducts", 2, true, Map.of(
+                        "title", "Öne Çıkanlar",
+                        "subtitle", "Günlük kullanım, güneş koruması ve özel cam ihtiyaçları için seçilmiş ürünler.",
+                        "items", List.of("Güneş gözlükleri", "Progresif camlar", "Mavi ışık filtreli camlar")
+                )),
+                new SitePageBlockResponse(null, "brandShowcase", 3, true, Map.of(
+                        "title", "Seçili Marka ve Ürünler",
+                        "subtitle", "Gözlük ve lens markalarını ayrı akışlarda keşfedin.",
+                        "eyewearItems", List.of(
+                                Map.of(
+                                        "name", "Ray-Ban",
+                                        "description", "Klasik güneş gözlüğü ve optik çerçeve modelleri.",
+                                        "imageUrl", "",
+                                        "url", ""
+                                ),
+                                Map.of(
+                                        "name", "Persol",
+                                        "description", "El işçiliği detaylı premium çerçeveler.",
+                                        "imageUrl", "",
+                                        "url", ""
+                                ),
+                                Map.of(
+                                        "name", "Vogue Eyewear",
+                                        "description", "Günlük kullanıma uygun modern ve renkli tasarımlar.",
+                                        "imageUrl", "",
+                                        "url", ""
+                                )
+                        ),
+                        "lensItems", List.of(
+                                Map.of(
+                                        "name", "Acuvue",
+                                        "description", "Günlük ve aylık kontakt lens seçenekleri.",
+                                        "imageUrl", "",
+                                        "url", ""
+                                ),
+                                Map.of(
+                                        "name", "Air Optix",
+                                        "description", "Nefes alabilen kontakt lens teknolojileri.",
+                                        "imageUrl", "",
+                                        "url", ""
+                                ),
+                                Map.of(
+                                        "name", "Biofinity",
+                                        "description", "Uzun süreli konfor için kontakt lens alternatifleri.",
+                                        "imageUrl", "",
+                                        "url", ""
+                                )
+                        )
+                )),
+                new SitePageBlockResponse(null, "about", 4, true, Map.of(
+                        "title", "Net görüş için sakin, özenli bir deneyim",
+                        "body", "OptiMaxx, optik ürün seçimini karmaşık olmaktan çıkarıp ihtiyaca uygun, anlaşılır ve güvenilir bir sürece dönüştürür.",
+                        "imageUrl", ""
+                )),
+                new SitePageBlockResponse(null, "cta", 5, true, Map.of(
+                        "title", "Size uygun camı birlikte seçelim",
+                        "subtitle", "Ekibimiz ihtiyaçlarınıza göre en doğru çözümü bulmanıza yardımcı olur.",
+                        "primaryButtonLabel", "Mağazaya Ulaş",
+                        "primaryButtonHref", "#contact",
+                        "secondaryButtonLabel", "Hizmetleri Gör",
+                        "secondaryButtonHref", "#services",
+                        "imageUrl", ""
+                )),
+                new SitePageBlockResponse(null, "hours", 6, true, Map.of(
+                        "title", "Çalışma Saatleri",
+                        "subtitle", "Mağaza ziyaretinizi planlamadan önce güncel saatleri kontrol edebilirsiniz.",
+                        "weekdays", "09:00 - 19:00",
+                        "saturday", "10:00 - 17:00",
+                        "sunday", "Kapalı",
+                        "note", "Resmi tatil ve özel günlerde saatler değişebilir."
+                )),
+                new SitePageBlockResponse(null, "contact", 7, true, Map.of(
                         "title", "Bize Ulaşın",
                         "phone", "+90 555 123 4567",
                         "email", "contact@optimaxx.com",
-                        "address", "Merkez Mahallesi, Optik Caddesi No: 1"
+                        "address", "Merkez Mahallesi, Optik Caddesi No: 1",
+                        "mapUrl", ""
+                )),
+                new SitePageBlockResponse(null, "socialLinks", 8, true, Map.of(
+                        "title", "Bizi Takip Edin",
+                        "subtitle", "Yeni modeller, kampanyalar ve mağaza duyuruları için sosyal hesaplarımız.",
+                        "items", List.of(
+                                Map.of("label", "Instagram", "url", "https://instagram.com/"),
+                                Map.of("label", "Facebook", "url", "https://facebook.com/"),
+                                Map.of("label", "TikTok", "url", "https://tiktok.com/")
+                        )
                 ))
         );
     }
