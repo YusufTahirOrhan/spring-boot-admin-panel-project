@@ -1,41 +1,36 @@
-# OptiMaxx Management System Foundation
+# OptiMaxx Backend
 
-This repository contains the foundation layer of the OptiMaxx Management System backend.
-
-## Architecture (Clean Foundation)
-
-- `domain` → core entities and repository contracts
-- `application` → use-case layer skeleton
-- `infrastructure` → technical integration placeholders
-- `interfaces` → REST API/controllers
-- `security` → JWT and RBAC foundation
-- `config` → OpenAPI and security configuration
+Spring Boot backend for the OptiMaxx management system.
 
 ## Local Infrastructure
-
-Start dependencies:
 
 ```bash
 docker compose up -d
 ```
 
-Stop dependencies:
-
-```bash
-docker compose down
-```
-
 Services:
-- PostgreSQL: `localhost:5432`
-- ClickHouse HTTP: `localhost:8123`
-- ClickHouse Native: `localhost:9000`
-- Redis: `localhost:6379`
 
-## Run Application
+- PostgreSQL: `localhost:5432`
+- Redis: `localhost:6379`
+- ClickHouse HTTP: `localhost:8123`
+
+## Run Locally
 
 ```bash
 ./mvnw spring-boot:run
 ```
+
+Windows PowerShell:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+Default dev owner credentials come from `application.yml`:
+
+- Username: `owner`
+- Email: `owner@optimaxx.local`
+- Password: `owner12345`
 
 ## Test
 
@@ -43,40 +38,44 @@ Services:
 ./mvnw test
 ```
 
-## API Docs
+Windows PowerShell:
+
+```powershell
+.\mvnw.cmd test
+```
+
+## Public Website CMS
+
+The public homepage is managed through page blocks.
+
+- Public: `GET /api/v1/public/pages/home`
+- Admin draft: `GET /api/v1/admin/pages/home/draft`
+- Admin save draft: `PUT /api/v1/admin/pages/home/draft`
+- Admin publish: `POST /api/v1/admin/pages/home/publish`
+
+Supported block types: `hero`, `services`, `featuredProducts`, `about`, `contact`, `hours`, `cta`.
+
+## Production Environment
+
+Set `SPRING_PROFILES_ACTIVE=prod` and provide:
+
+```bash
+DB_URL=jdbc:postgresql://host:5432/optimaxx
+DB_USERNAME=...
+DB_PASSWORD=...
+REDIS_HOST=...
+REDIS_PORT=6379
+CLICKHOUSE_URL=jdbc:clickhouse://host:8123/default
+CLICKHOUSE_USERNAME=...
+CLICKHOUSE_PASSWORD=...
+JWT_SECRET_KEY=at-least-32-random-characters
+BOOTSTRAP_OWNER_ENABLED=false
+```
+
+If a first owner account must be created automatically on first deploy, set `BOOTSTRAP_OWNER_ENABLED=true` once and provide `BOOTSTRAP_OWNER_USERNAME`, `BOOTSTRAP_OWNER_EMAIL`, and `BOOTSTRAP_OWNER_PASSWORD`; turn it off after the owner exists.
+
+## API Docs and Health
 
 - Swagger UI: `http://localhost:8080/swagger-ui/index.html`
 - OpenAPI JSON: `http://localhost:8080/v3/api-docs`
-
-## Health Endpoints
-
-- Actuator health: `http://localhost:8080/actuator/health`
-- API health sample: `http://localhost:8080/api/v1/system/health`
-
-## Commit Message Convention
-
-Use English commit messages with this structure:
-
-1. **Subject** (single line, conventional commit format)
-   - Example: `feat: add login rate limit and temporary lockout protection`
-2. **Body** (3-6 bullets)
-   - `Added: ...`
-   - `Updated: ...`
-   - `Tests: ...`
-
-Example:
-
-```text
-feat: add login rate limit and temporary lockout protection
-
-- Added in-memory login attempt tracking with temporary lockout window.
-- Updated AuthService login flow to enforce lock checks and reset attempts on success.
-- Updated API exception handling to return structured 429 responses.
-- Tests: ./mvnw test (passed)
-```
-
-## Notes
-
-- Soft delete metadata exists in `BaseEntity` (`is_deleted`, `deleted_at`, `deleted_by`).
-- Multi-store readiness is represented with `store_id` in base model and ClickHouse schema.
-- ClickHouse audit log schema is defined at `src/main/resources/db/clickhouse/audit_events.sql` and designed as immutable INSERT-only events.
+- Health: `http://localhost:8080/actuator/health`

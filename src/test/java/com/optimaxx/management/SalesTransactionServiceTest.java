@@ -170,7 +170,68 @@ class SalesTransactionServiceTest {
                 org.mockito.ArgumentMatchers.contains("SALE transaction"),
                 org.mockito.ArgumentMatchers.eq("SALE_TRANSACTION"),
                 org.mockito.ArgumentMatchers.isNull(),
-                org.mockito.ArgumentMatchers.contains("null:consume")
+                org.mockito.ArgumentMatchers.contains("item:0:consume")
+        );
+    }
+
+    @Test
+    void shouldConsumeStockForEachSaleItem() {
+        SaleTransactionRepository saleRepository = Mockito.mock(SaleTransactionRepository.class);
+        TransactionTypeRepository typeRepository = Mockito.mock(TransactionTypeRepository.class);
+        CustomerRepository customerRepository = Mockito.mock(CustomerRepository.class);
+        SecurityAuditService auditService = Mockito.mock(SecurityAuditService.class);
+        ActivityLogRepository activityLogRepository = Mockito.mock(ActivityLogRepository.class);
+        InventoryStockCoordinator inventoryStockCoordinator = Mockito.mock(InventoryStockCoordinator.class);
+
+        UUID typeId = UUID.randomUUID();
+        UUID firstItemId = UUID.randomUUID();
+        UUID secondItemId = UUID.randomUUID();
+        TransactionType type = new TransactionType();
+        type.setCode("GLASS_SALE");
+        type.setName("Glass Sale");
+        type.setActive(true);
+        type.setCategory(TransactionTypeCategory.SALE);
+
+        when(typeRepository.findByIdAndDeletedFalse(typeId)).thenReturn(Optional.of(type));
+        when(saleRepository.findTopByStoreIdAndReceiptNumberStartingWithOrderByReceiptNumberDesc(any(UUID.class), any(String.class))).thenReturn(Optional.empty());
+        when(saleRepository.existsByStoreIdAndReceiptNumberAndDeletedFalse(any(UUID.class), any(String.class))).thenReturn(false);
+        when(saleRepository.save(any(SaleTransaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        InventoryItem item = new InventoryItem();
+        item.setSku("SKU-1");
+        when(inventoryStockCoordinator.consume(any(UUID.class), any(Integer.class), any(String.class), any(String.class), org.mockito.ArgumentMatchers.nullable(UUID.class), any(String.class))).thenReturn(item);
+
+        SalesTransactionService service = new SalesTransactionService(saleRepository, typeRepository, customerRepository, activityLogRepository, auditService, inventoryStockCoordinator);
+        service.create(new CreateSaleTransactionRequest(
+                typeId,
+                null,
+                "Yusuf",
+                new BigDecimal("300.00"),
+                null,
+                "CARD",
+                null,
+                null,
+                null,
+                List.of(
+                        new com.optimaxx.management.interfaces.rest.dto.SaleTransactionLineItemRequest(firstItemId, "Frame", "SKU-1", 1, new BigDecimal("100.00"), new BigDecimal("100.00")),
+                        new com.optimaxx.management.interfaces.rest.dto.SaleTransactionLineItemRequest(secondItemId, "Lens", "SKU-2", 2, new BigDecimal("100.00"), new BigDecimal("200.00"))
+                )
+        ));
+
+        verify(inventoryStockCoordinator).consume(
+                org.mockito.ArgumentMatchers.eq(firstItemId),
+                org.mockito.ArgumentMatchers.eq(1),
+                org.mockito.ArgumentMatchers.contains("SALE transaction"),
+                org.mockito.ArgumentMatchers.eq("SALE_TRANSACTION"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.contains("item:0:consume")
+        );
+        verify(inventoryStockCoordinator).consume(
+                org.mockito.ArgumentMatchers.eq(secondItemId),
+                org.mockito.ArgumentMatchers.eq(2),
+                org.mockito.ArgumentMatchers.contains("SALE transaction"),
+                org.mockito.ArgumentMatchers.eq("SALE_TRANSACTION"),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.contains("item:1:consume")
         );
     }
 

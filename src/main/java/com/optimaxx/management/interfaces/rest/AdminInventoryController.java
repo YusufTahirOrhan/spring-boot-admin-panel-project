@@ -7,6 +7,8 @@ import com.optimaxx.management.interfaces.rest.dto.InventoryStockChangeRequest;
 import com.optimaxx.management.security.InventoryService;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,6 +41,12 @@ public class AdminInventoryController {
     public InventoryItemResponse update(@PathVariable UUID itemId,
                                         @RequestBody AdminUpdateInventoryItemRequest request) {
         return inventoryService.updateItem(itemId, request);
+    }
+
+    @DeleteMapping("/{itemId}")
+    public ResponseEntity<Void> delete(@PathVariable UUID itemId) {
+        inventoryService.softDeleteItem(itemId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/{itemId}/stock")

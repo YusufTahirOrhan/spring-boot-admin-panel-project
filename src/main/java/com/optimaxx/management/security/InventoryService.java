@@ -94,6 +94,15 @@ public class InventoryService {
     }
 
     @Transactional
+    public void softDeleteItem(UUID itemId) {
+        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalse(itemId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Inventory item not found"));
+
+        item.setDeleted(true);
+        securityAuditService.log(AuditEventType.INVENTORY_ITEM_DELETED, null, "INVENTORY", item.getSku(), "{}");
+    }
+
+    @Transactional
     public InventoryItemResponse changeStock(UUID itemId, InventoryStockChangeRequest request) {
         if (request == null || request.movementType() == null || request.quantity() == null || request.quantity() <= 0) {
             throw new ResponseStatusException(BAD_REQUEST, "movementType and positive quantity are required");

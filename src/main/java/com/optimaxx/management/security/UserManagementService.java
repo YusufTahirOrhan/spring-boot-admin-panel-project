@@ -9,6 +9,7 @@ import com.optimaxx.management.security.audit.AuditEventType;
 import com.optimaxx.management.security.audit.SecurityAuditService;
 import jakarta.annotation.PostConstruct;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -92,6 +93,13 @@ public class UserManagementService {
         User saved = userRepository.save(user);
         securityAuditService.log(AuditEventType.USER_CREATED, saved, "USER", saved.getUsername(), "{\"source\":\"admin\"}");
         return toResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<UserResponse> listUsers() {
+        return userRepository.findByDeletedFalseOrderByUsernameAsc().stream()
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)

@@ -103,6 +103,9 @@ class AdminAnalyticsIntegrationTest {
     private LeadRepository leadRepository;
 
     @MockitoBean
+    private com.optimaxx.management.domain.repository.SitePageBlockRepository sitePageBlockRepository;
+
+    @MockitoBean
     private com.optimaxx.management.security.InventoryStockCoordinator inventoryStockCoordinator;
 
     // ── Service under test (real bean, NOT mocked) ───────────────────────────────

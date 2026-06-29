@@ -5,12 +5,16 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import java.util.UUID;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import jakarta.persistence.CascadeType;
 
 @Entity
 @Table(name = "sale_transactions")
@@ -70,6 +74,9 @@ public class SaleTransaction extends BaseEntity {
 
     @Column(name = "occurred_at", nullable = false)
     private Instant occurredAt;
+
+    @OneToMany(mappedBy = "saleTransaction", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SaleTransactionItem> items = new ArrayList<>();
 
     public TransactionType getTransactionType() {
         return transactionType;
@@ -209,5 +216,18 @@ public class SaleTransaction extends BaseEntity {
 
     public void setOccurredAt(Instant occurredAt) {
         this.occurredAt = occurredAt;
+    }
+
+    public List<SaleTransactionItem> getItems() {
+        return items;
+    }
+
+    public void setItems(List<SaleTransactionItem> items) {
+        this.items = items;
+    }
+
+    public void addItem(SaleTransactionItem item) {
+        items.add(item);
+        item.setSaleTransaction(this);
     }
 }
