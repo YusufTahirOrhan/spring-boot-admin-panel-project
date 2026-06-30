@@ -34,14 +34,20 @@ public class ForgotPasswordAttemptService {
         long windowMinutes = Math.max(properties.windowMinutes(), 1);
 
         if (redisTemplate != null) {
-            Long requestCount = redisTemplate.opsForValue().increment(counterKey(normalizedEmail));
-            if (requestCount != null && requestCount == 1L) {
-                redisTemplate.expire(counterKey(normalizedEmail), Duration.ofMinutes(windowMinutes));
+            try {
+                Long requestCount = redisTemplate.opsForValue().increment(counterKey(normalizedEmail));
+                if (requestCount != null && requestCount == 1L) {
+                    redisTemplate.expire(counterKey(normalizedEmail), Duration.ofMinutes(windowMinutes));
+                }
+                if (requestCount != null && requestCount > maxRequests) {
+                    throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many password reset requests. Try again later.");
+                }
+                return;
+            } catch (ResponseStatusException exception) {
+                throw exception;
+            } catch (RuntimeException ignored) {
+                // Redis is optional; keep forgot-password throttling active in-memory.
             }
-            if (requestCount != null && requestCount > maxRequests) {
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many password reset requests. Try again later.");
-            }
-            return;
         }
 
         WindowState state = attempts.computeIfAbsent(normalizedEmail, ignored -> new WindowState(System.currentTimeMillis(), 0));

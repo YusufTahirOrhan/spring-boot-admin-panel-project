@@ -34,11 +34,17 @@ public class LoginAttemptService {
         String normalizedUsername = username.toLowerCase();
 
         if (redisTemplate != null) {
-            String lockedUntil = redisTemplate.opsForValue().get(lockKey(normalizedUsername));
-            if (lockedUntil != null) {
-                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many login attempts. Try again later.");
+            try {
+                String lockedUntil = redisTemplate.opsForValue().get(lockKey(normalizedUsername));
+                if (lockedUntil != null) {
+                    throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS, "Too many login attempts. Try again later.");
+                }
+                return;
+            } catch (ResponseStatusException exception) {
+                throw exception;
+            } catch (RuntimeException ignored) {
+                // Redis is an optional ephemeral layer; fall back to in-memory state if it is unavailable.
             }
-            return;
         }
 
         AttemptState state = attempts.get(normalizedUsername);
@@ -64,16 +70,20 @@ public class LoginAttemptService {
         long lockMinutes = Math.max(properties.lockMinutes(), 1);
 
         if (redisTemplate != null) {
-            Long failedCount = redisTemplate.opsForValue().increment(failKey(normalizedUsername));
-            if (failedCount != null && failedCount >= maxFailures) {
-                redisTemplate.opsForValue().set(
-                        lockKey(normalizedUsername),
-                        Instant.now().plus(lockMinutes, ChronoUnit.MINUTES).toString(),
-                        Duration.ofMinutes(lockMinutes)
-                );
-                redisTemplate.delete(failKey(normalizedUsername));
+            try {
+                Long failedCount = redisTemplate.opsForValue().increment(failKey(normalizedUsername));
+                if (failedCount != null && failedCount >= maxFailures) {
+                    redisTemplate.opsForValue().set(
+                            lockKey(normalizedUsername),
+                            Instant.now().plus(lockMinutes, ChronoUnit.MINUTES).toString(),
+                            Duration.ofMinutes(lockMinutes)
+                    );
+                    redisTemplate.delete(failKey(normalizedUsername));
+                }
+                return;
+            } catch (RuntimeException ignored) {
+                // Redis counters are best-effort; keep rate limiting active in this JVM.
             }
-            return;
         }
 
         AttemptState state = attempts.computeIfAbsent(normalizedUsername, key -> new AttemptState());
@@ -92,9 +102,14 @@ public class LoginAttemptService {
         String normalizedUsername = username.toLowerCase();
 
         if (redisTemplate != null) {
-            redisTemplate.delete(failKey(normalizedUsername));
-            redisTemplate.delete(lockKey(normalizedUsername));
-            return;
+            try {
+                redisTemplate.delete(failKey(normalizedUsername));
+                redisTemplate.delete(lockKey(normalizedUsername));
+                attempts.remove(normalizedUsername);
+                return;
+            } catch (RuntimeException ignored) {
+                // Continue with local cleanup when Redis is temporarily unavailable.
+            }
         }
 
         attempts.remove(normalizedUsername);

@@ -7,7 +7,24 @@ This runbook deploys the first production version on Heroku:
 - Public domains: `optimaxx.com.tr`, `www.optimaxx.com.tr`, `panel.optimaxx.com.tr`
 - API domain: `api.optimaxx.com.tr`
 
-Production v1 uses Heroku Postgres as the source of truth, Heroku Key-Value Store for Redis-backed auth protection state, and Cloudinary for persistent CMS image uploads. ClickHouse is intentionally not required for this first deploy.
+Production v1 uses Heroku Postgres and Cloudinary as the only durable data stores. Redis is optional and ephemeral: it is used only for login/forgot-password attempt counters and similar short-lived cache/rate-limit state. ClickHouse is intentionally disabled for this first deploy.
+
+## 0. Budget Target
+
+The low-traffic production target is roughly `$13/month` or less. Confirm the final estimate in the Heroku Dashboard before release because plan prices can change.
+
+| Component | Plan | Expected role | Approx. monthly cost |
+| --- | --- | --- | --- |
+| Frontend dyno | Eco | Next.js web dyno, may sleep when idle | Part of `$5` Eco pool |
+| Backend dyno | Eco | Spring Boot API dyno, may sleep when idle | Part of `$5` Eco pool |
+| Database | `heroku-postgresql:essential-0` | Durable source of truth | About `$5` |
+| Redis / Heroku Key-Value Store | `heroku-redis:mini` | Ephemeral counters/cache only | About `$3` |
+| Upload storage | Cloudinary Starter/Free | Durable site editor images | `$0` |
+| ClickHouse | Disabled | Future optional mirror only | `$0` |
+
+Eco dynos share the Eco monthly dyno-hour pool. Two web dynos can consume that pool faster if both stay awake continuously, so monitor Eco hours in the Heroku Dashboard. For the expected low traffic, sleep behavior should keep usage low. The first request after sleep can be slow, but this does not cause data loss because business data is in PostgreSQL and uploaded assets are in Cloudinary.
+
+Redis Mini is not a durable data store. Reboot/failure data loss is acceptable because Redis stores only temporary auth attempt counters/cache. Customers, sales, stock, prescriptions, repairs, CMS content, users, audit records, and all business data must stay in PostgreSQL.
 
 ## 1. Login
 
@@ -25,7 +42,18 @@ heroku apps:create optimaxx-api-prod --region eu
 heroku apps:create optimaxx-web-prod --region eu
 ```
 
-## 3. Backend Add-ons
+## 3. Dyno Plan
+
+Subscribe to the Eco dyno plan in Heroku Billing, then run one Eco web dyno for each app:
+
+```bash
+heroku ps:scale web=1:eco -a optimaxx-api-prod
+heroku ps:scale web=1:eco -a optimaxx-web-prod
+```
+
+Eco is the budget choice for low traffic. Upgrade to Basic/Standard dynos later if sleep/wake latency becomes unacceptable.
+
+## 4. Backend Add-ons
 
 Attach Heroku Postgres to the backend app:
 
@@ -34,24 +62,26 @@ heroku addons:create heroku-postgresql:essential-0 -a optimaxx-api-prod
 heroku pg:wait -a optimaxx-api-prod
 ```
 
-Attach Heroku Key-Value Store / Redis on a persistent plan. Do not use an ephemeral/dev-only cache plan for production auth lockout state.
+Attach Heroku Key-Value Store / Redis Mini. The Heroku CLI add-on slug is still `heroku-redis`:
 
 ```bash
-heroku addons:plans heroku-redis
-heroku addons:create heroku-redis:<persistent-plan> -a optimaxx-api-prod
+heroku addons:create heroku-redis:mini -a optimaxx-api-prod
 ```
 
-The add-on should provide `REDIS_URL`. Verify it exists:
+The add-on provides `REDIS_URL`. Verify it exists:
 
 ```bash
 heroku config:get REDIS_URL -a optimaxx-api-prod
 ```
 
-Set up Cloudinary for persistent site editor assets. Either use the Heroku add-on:
+Redis is recommended but optional for production v1. If `REDIS_URL` is absent, the backend still starts and falls back to per-dyno in-memory counters for login attempts and forgot-password attempts. Do not store business data or audit records in Redis.
+
+Heroku Key-Value Store requires TLS. The backend enables Lettuce SSL when `REDIS_URL`/`spring.data.redis.url` is present.
+
+Set up Cloudinary for persistent site editor assets. Either use the Heroku add-on and confirm the Starter/Free plan in the dashboard:
 
 ```bash
-heroku addons:plans cloudinary
-heroku addons:create cloudinary:<plan> -a optimaxx-api-prod
+heroku addons:create cloudinary -a optimaxx-api-prod
 ```
 
 Or use an external Cloudinary account and set one of these config styles:
@@ -70,9 +100,9 @@ heroku config:set \
 
 Cloudinary is the durable upload store. Heroku dyno local disk is ephemeral and must not be treated as persistent asset storage.
 
-## 4. Backend Config Vars
+## 5. Backend Config Vars
 
-Heroku Postgres provides `DATABASE_URL`. The backend parses it into Spring JDBC settings. Heroku Key-Value Store provides `REDIS_URL`. Do not set ClickHouse variables for production v1.
+Heroku Postgres provides `DATABASE_URL`. The backend parses it into Spring JDBC settings. Heroku Key-Value Store provides `REDIS_URL` if the Redis add-on is installed. Do not set ClickHouse variables for production v1.
 
 ```bash
 heroku config:set \
@@ -92,7 +122,9 @@ heroku config:set \
 
 `BOOTSTRAP_OWNER_PASSWORD` is temporary. Disable bootstrap after the owner has logged in successfully.
 
-## 5. Frontend Config Vars
+Cloudinary must be configured for production uploads. With `SPRING_PROFILES_ACTIVE=prod` and `SITE_ASSET_STORAGE=cloudinary`, a missing Cloudinary configuration should fail uploads clearly instead of writing files to Heroku local disk.
+
+## 6. Frontend Config Vars
 
 Set these on `optimaxx-web-prod`:
 
@@ -106,7 +138,7 @@ heroku config:set \
 
 The public site must not expose login, admin, panel, or appointment/randevu buttons. Public `/login`, `/admin`, and `/sales` requests on non-panel hosts redirect to `PANEL_ORIGIN`.
 
-## 6. Container Build and Release
+## 7. Container Build and Release
 
 Backend:
 
@@ -128,7 +160,7 @@ heroku container:push web \
 heroku container:release web -a optimaxx-web-prod
 ```
 
-## 7. Domains
+## 8. Domains
 
 Backend:
 
@@ -148,7 +180,7 @@ heroku domains -a optimaxx-web-prod
 
 Copy the Heroku DNS target returned for each domain.
 
-## 8. Cloudflare DNS
+## 9. Cloudflare DNS
 
 Create CNAME records in Cloudflare using the DNS targets from `heroku domains`:
 
@@ -161,7 +193,7 @@ Create CNAME records in Cloudflare using the DNS targets from `heroku domains`:
 
 For the apex/root record, use Cloudflare CNAME flattening. Keep the records DNS-only while Heroku ACM is issuing certificates; proxying can be evaluated after SSL is healthy.
 
-## 9. ACM / SSL
+## 10. ACM / SSL
 
 Enable and verify automated certificates:
 
@@ -184,7 +216,7 @@ curl -I https://optimaxx.com.tr
 curl -I https://panel.optimaxx.com.tr
 ```
 
-## 10. Owner Bootstrap
+## 11. Owner Bootstrap
 
 After release, watch logs and log in as the bootstrap owner at `https://panel.optimaxx.com.tr/login`.
 
@@ -199,7 +231,7 @@ heroku config:set BOOTSTRAP_OWNER_ENABLED=false -a optimaxx-api-prod
 heroku restart -a optimaxx-api-prod
 ```
 
-## 11. Backups
+## 12. Backups
 
 Manual Heroku Postgres backup:
 
@@ -208,7 +240,7 @@ heroku pg:backups:capture -a optimaxx-api-prod
 heroku pg:backups -a optimaxx-api-prod
 ```
 
-Scheduled Heroku Postgres backup:
+Optional scheduled Heroku Postgres backup:
 
 ```bash
 heroku pg:backups:schedule DATABASE_URL --at '03:00 Europe/Istanbul' -a optimaxx-api-prod
@@ -221,9 +253,11 @@ Restore drills should be planned before production traffic grows:
 heroku pg:backups:download -a optimaxx-api-prod
 ```
 
-Cloudinary assets are durable in Cloudinary. They are not included in Heroku PGBackups, and they are not stored durably on Heroku dyno disk. Cloudinary backup/export policy should be handled from the Cloudinary account plan and operations process.
+Cloudinary assets are durable in Cloudinary, but they are not included in Heroku PGBackups. On the free plan, check Cloudinary export/backup options and quota limits separately if asset backup becomes an operational requirement.
 
-## 12. Backup Smoke Test
+Redis backups are not required because Redis is not a source of truth. ClickHouse backups are not required for production v1 because ClickHouse is disabled.
+
+## 13. Backup Smoke Test
 
 Run after the first production deploy:
 
@@ -243,7 +277,7 @@ curl -f \
 
 Expected result: JSON with a Cloudinary `https://res.cloudinary.com/...` URL. If Cloudinary config is missing, the endpoint should return a clear configuration error instead of writing to Heroku local disk.
 
-## 13. ClickHouse Status
+## 14. ClickHouse Status
 
 ClickHouse is disabled for production v1 unless these are explicitly set:
 
@@ -256,3 +290,11 @@ CLICKHOUSE_PASSWORD
 Without `CLICKHOUSE_URL`, the app still starts, admin audit screens read PostgreSQL `activity_logs`, analytics reads PostgreSQL repositories, and the retry queue stays inactive. `SecurityAuditService` always writes to PostgreSQL first; ClickHouse is only a future optional audit/analytics mirror.
 
 ClickHouse does not serve frontend data in production v1. Do not include ClickHouse in the first deploy checklist. If ClickHouse Cloud is added later, backup/restore and retention must be planned separately for that service.
+
+## 15. Future Upgrades
+
+Use these only when traffic or operational requirements justify the extra cost:
+
+- Upgrade Eco dynos to Basic/Standard if sleep latency is hurting users.
+- Upgrade Redis to a persistent/premium Heroku Key-Value Store plan only if Redis starts holding state that must survive restarts. Production v1 should not need this.
+- Add ClickHouse Cloud only as an optional PostgreSQL audit/analytics mirror after audit volume grows. Plan ClickHouse backup/restore before enabling it.
