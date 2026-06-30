@@ -1,0 +1,18 @@
+{
+	email {$CADDY_EMAIL}
+}
+
+optimaxx.com.tr, www.optimaxx.com.tr {
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}
+
+panel.optimaxx.com.tr {
+	encode zstd gzip
+	reverse_proxy frontend:3000
+}
+
+api.optimaxx.com.tr {
+	encode zstd gzip
+	reverse_proxy backend:8080
+}

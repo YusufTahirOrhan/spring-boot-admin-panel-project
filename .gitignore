@@ -34,3 +34,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Production deploy backups ###
+deploy/backups/
