@@ -19,6 +19,20 @@ import org.junit.jupiter.api.Test;
 class ClickhouseAuditPublisherTest {
 
     @Test
+    void shouldIgnorePublishWhenClickhouseUrlIsBlank() {
+        ClickhouseProperties properties = new ClickhouseProperties("", "", "");
+        ClickhouseAuditRetryProperties retryProperties = new ClickhouseAuditRetryProperties();
+        ResilientClickhouseAuditPublisher publisher = new ResilientClickhouseAuditPublisher(properties, retryProperties, new SimpleMeterRegistry());
+
+        publisher.publish(createActivityLog());
+        publisher.flushRetryQueue();
+
+        assertThat(publisher.getPendingQueueSize()).isZero();
+        assertThat(publisher.getPublishFailureCount()).isZero();
+        assertThat(publisher.getRetryAttemptCount()).isZero();
+    }
+
+    @Test
     void shouldNotThrowWhenClickhouseEndpointIsUnavailable() {
         ClickhouseProperties properties = new ClickhouseProperties("http://localhost:65534/default", "default", "");
         ClickhouseAuditRetryProperties retryProperties = new ClickhouseAuditRetryProperties();

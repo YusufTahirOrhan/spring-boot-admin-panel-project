@@ -19,6 +19,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest(properties = {
+        "clickhouse.url=",
         "spring.autoconfigure.exclude=" +
                 "org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration," +
                 "org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration," +

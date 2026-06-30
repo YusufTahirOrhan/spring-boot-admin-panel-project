@@ -22,7 +22,15 @@ public class SiteAssetService {
     private static final long MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp", "image/gif");
 
-    private final Path uploadDirectory = Path.of("uploads", "site").toAbsolutePath().normalize();
+    private final SiteAssetProperties properties;
+    private final CloudinaryAssetClient cloudinaryAssetClient;
+    private final Path uploadDirectory;
+
+    public SiteAssetService(SiteAssetProperties properties, CloudinaryAssetClient cloudinaryAssetClient) {
+        this.properties = properties;
+        this.cloudinaryAssetClient = cloudinaryAssetClient;
+        this.uploadDirectory = Path.of(properties.getLocalDirectory()).toAbsolutePath().normalize();
+    }
 
     public AssetUploadResponse upload(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -42,16 +50,11 @@ public class SiteAssetService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "File content does not match an allowed image type");
             }
 
-            Files.createDirectories(uploadDirectory);
-            String extension = extensionFor(contentType);
-            String filename = UUID.randomUUID() + extension;
-            Path target = uploadDirectory.resolve(filename).normalize();
-            Files.write(target, bytes, StandardOpenOption.CREATE_NEW);
-            String url = ServletUriComponentsBuilder.fromCurrentContextPath()
-                    .path("/api/v1/public/assets/site/")
-                    .path(filename)
-                    .toUriString();
-            return new AssetUploadResponse(url);
+            if (properties.isCloudinaryStorage()) {
+                return uploadToCloudinary(bytes, contentType);
+            }
+
+            return uploadToLocalDisk(bytes, contentType);
         } catch (IOException exception) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "File could not be uploaded");
         }
@@ -82,6 +85,36 @@ public class SiteAssetService {
         if (lower.endsWith(".webp")) return "image/webp";
         if (lower.endsWith(".gif")) return "image/gif";
         return "image/jpeg";
+    }
+
+    private AssetUploadResponse uploadToCloudinary(byte[] bytes, String contentType) {
+        if (!properties.hasCloudinaryConfig()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Cloudinary upload storage is not configured");
+        }
+
+        String url;
+        try {
+            url = cloudinaryAssetClient.upload(bytes, contentType, UUID.randomUUID().toString());
+        } catch (IOException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloudinary upload failed");
+        }
+        if (url == null || !url.startsWith("https://")) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Cloudinary did not return a secure URL");
+        }
+        return new AssetUploadResponse(url);
+    }
+
+    private AssetUploadResponse uploadToLocalDisk(byte[] bytes, String contentType) throws IOException {
+        Files.createDirectories(uploadDirectory);
+        String extension = extensionFor(contentType);
+        String filename = UUID.randomUUID() + extension;
+        Path target = uploadDirectory.resolve(filename).normalize();
+        Files.write(target, bytes, StandardOpenOption.CREATE_NEW);
+        String url = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/api/v1/public/assets/site/")
+                .path(filename)
+                .toUriString();
+        return new AssetUploadResponse(url);
     }
 
     private String extensionFor(String contentType) {

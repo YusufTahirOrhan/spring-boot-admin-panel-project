@@ -3,12 +3,12 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
+    url: ${SPRING_DATASOURCE_URL:${JDBC_DATABASE_URL:${DB_URL:}}}
+    username: ${SPRING_DATASOURCE_USERNAME:${JDBC_DATABASE_USERNAME:${DB_USERNAME:}}}
+    password: ${SPRING_DATASOURCE_PASSWORD:${JDBC_DATABASE_PASSWORD:${DB_PASSWORD:}}}
   data:
     redis:
-      host: ${REDIS_HOST}
+      host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
   jpa:
     hibernate:
@@ -16,9 +16,9 @@ spring:
     open-in-view: false
 
 clickhouse:
-  url: ${CLICKHOUSE_URL}
-  username: ${CLICKHOUSE_USERNAME}
-  password: ${CLICKHOUSE_PASSWORD}
+  url: ${CLICKHOUSE_URL:}
+  username: ${CLICKHOUSE_USERNAME:}
+  password: ${CLICKHOUSE_PASSWORD:}
 
 security:
   bootstrap:
@@ -47,6 +47,8 @@ management:
 app:
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
+  site-assets:
+    storage: ${SITE_ASSET_STORAGE:cloudinary}
 
 logging:
   level:
